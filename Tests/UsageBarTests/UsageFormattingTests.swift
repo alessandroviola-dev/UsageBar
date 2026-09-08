@@ -29,13 +29,13 @@ final class UsageFormattingTests: XCTestCase {
             secondary: UsageWindow(id: "two", label: "7D", remainingPercent: 42, resetAt: nil),
             fetchedAt: .now
         )
-        XCTAssertEqual(UsageFormatting.statusTitle(snapshot: snapshot), "5H 76% | 7D 42%")
+        XCTAssertEqual(UsageFormatting.statusTitle(providerName: "Codex", snapshot: snapshot), "Codex 5H 76% | 7D 42%")
     }
 
     func testSingleWindowAndMissingSnapshot() {
         let snapshot = UsageSnapshot(providerID: "test", accountID: "test", primary: UsageWindow(id: "one", label: "Credits", remainingPercent: 63, resetAt: nil), secondary: nil, fetchedAt: .now)
-        XCTAssertEqual(UsageFormatting.statusTitle(snapshot: snapshot), "Credits 63%")
-        XCTAssertEqual(UsageFormatting.statusTitle(snapshot: nil), "Usage ?")
+        XCTAssertEqual(UsageFormatting.statusTitle(providerName: "OpenRouter", snapshot: snapshot), "OpenRouter Credits 63%")
+        XCTAssertEqual(UsageFormatting.statusTitle(providerName: "Copilot", snapshot: nil), "Copilot ?")
     }
 
     func testUsageWindowClampsPercentage() {

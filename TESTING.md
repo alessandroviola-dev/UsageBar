@@ -5,12 +5,14 @@ Only executed checks are marked PASS.
 | Check | Result | Notes |
 |---|---|---|
 | Debug / release arm64 build | PASS | `swift test`; `swift build -c release --arch arm64`. |
-| XCTest | PASS | 21 tests, 0 failures. |
+| XCTest | PASS | 22 tests, 0 failures. |
 | Codex live retrieval | PASS | Authenticated official local app-server; no prompt/generation request. |
 | Copilot live retrieval | PASS | Existing authenticated official GitHub CLI returned non-billable Copilot quota snapshots; no token was read or stored. |
 | Local provider discovery | PASS | Fixture tests cover present/absent tools and duplicate-free registry; this Mac detected Codex and authenticated GitHub CLI. |
 | Providers rescan UI | PASS | Accessibility automation opened Providers and ran Rescan; it showed connected Codex/Copilot and truthful not-installed/API-key states. |
-| Copilot selected-provider UI | PASS | Accessibility automation selected the existing GitHub CLI account; UsageBar displayed `Chat 100% | Completions 100%`. |
+| Copilot selected-provider UI | PASS | Accessibility automation selected the existing GitHub CLI account; UsageBar displayed `Copilot Chat 100% | Completions 100%`. |
+| Multi-provider cached dropdown | PASS | Accessibility automation observed `Codex 5H 31% | 7D 79%` and `Copilot Chat 100% | Completions 100%` together. |
+| Provider-prefixed switch | PASS | Accessibility automation observed `Codex 5H 31% | 7D 79%` → `Copilot Chat 100% | Completions 100%` → Codex. |
 | Codex independent validation | PASS | OpenUsage and UsageBar both showed `5H 69% | 7D 85%` on 2026-09-08. |
 | Automatic 60-second refresh | PASS | Installed app was observed spawning one short-lived Codex app-server child on its timer. |
 | Manual Refresh | PASS | Accessibility automation invoked the menu action; title changed from `5H 58% | 7D 83%` to `5H 57% | 7D 83%`. |

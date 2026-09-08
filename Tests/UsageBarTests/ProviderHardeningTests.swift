@@ -65,6 +65,27 @@ final class ProviderHardeningTests: XCTestCase {
         try await Task.sleep(for: .milliseconds(80))
         XCTAssertEqual(monitor.snapshot?.primary?.remainingPercent, 76)
         XCTAssertTrue(monitor.lastError)
+        XCTAssertEqual(monitor.cachedSnapshot(for: "codex")?.primary?.remainingPercent, 76)
+    }
+
+    @MainActor
+    func testCachedSnapshotsRemainIndependentAcrossSwitches() async throws {
+        let suite = "UsageBarTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let state = FakeState(results: [
+            .success(FakeProvider.snapshot(provider: "codex", remaining: 76)),
+            .success(FakeProvider.snapshot(provider: "copilot", remaining: 99))
+        ])
+        let monitor = UsageMonitor(registry: ProviderRegistry(providers: [FakeProvider(id: "codex", state: state), FakeProvider(id: "copilot", state: state)]), defaults: defaults)
+        monitor.refresh(manual: true)
+        try await Task.sleep(for: .milliseconds(80))
+        monitor.select(providerID: "copilot")
+        try await Task.sleep(for: .milliseconds(80))
+        XCTAssertEqual(monitor.cachedSnapshot(for: "codex")?.primary?.remainingPercent, 76)
+        XCTAssertEqual(monitor.cachedSnapshot(for: "copilot")?.primary?.remainingPercent, 99)
+        monitor.select(providerID: "codex")
+        XCTAssertEqual(monitor.snapshot?.primary?.remainingPercent, 76)
     }
 }
 

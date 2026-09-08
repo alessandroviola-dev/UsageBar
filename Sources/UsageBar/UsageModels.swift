@@ -41,11 +41,16 @@ enum UsageFormatting {
         return "\(minutes)M"
     }
 
-    static func statusTitle(snapshot: UsageSnapshot?) -> String {
-        guard let snapshot else { return "Usage ?" }
+    static func snapshotSummary(_ snapshot: UsageSnapshot?) -> String? {
+        guard let snapshot else { return nil }
         let values = [snapshot.primary, snapshot.secondary].compactMap { $0 }
-        guard !values.isEmpty else { return "Usage ?" }
+        guard !values.isEmpty else { return nil }
         return values.prefix(2).map { "\($0.label) \($0.remainingPercent)%" }.joined(separator: " | ")
+    }
+
+    static func statusTitle(providerName: String, snapshot: UsageSnapshot?) -> String {
+        guard let summary = snapshotSummary(snapshot) else { return "\(providerName) ?" }
+        return "\(providerName) \(summary)"
     }
 
     static func resetText(_ date: Date?, now: Date = .now) -> String? {

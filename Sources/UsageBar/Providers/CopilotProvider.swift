@@ -5,11 +5,11 @@ import Foundation
 struct CopilotProvider: UsageProvider {
     let id = "github-copilot"
     let displayName = "GitHub Copilot"
+    let statusName = "Copilot"
     let allowedHosts = ["api.github.com"]
 
     func connectionStatus() async -> ProviderConnectionStatus {
-        do { _ = try await fetchUsage(); return .connected(accountName: "GitHub Copilot") }
-        catch { return LocalProviderDiscovery().executable(named: "gh") == nil ? .unsupported(reason: "Not installed") : .disconnected }
+        LocalProviderDiscovery().state(for: id) == .connected ? .connected(accountName: "GitHub Copilot") : .disconnected
     }
     func connect() async throws { _ = try await fetchUsage() }
     func disconnect() async throws {}

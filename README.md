@@ -1,10 +1,10 @@
 # UsageBar
 
-`5H 76% | 7D 42%`
+`Codex 5H 76% | 7D 42%`
 
 A tiny native macOS menu-bar utility for AI usage limits.
 
-UsageBar shows **remaining** quota for one selected provider, with at most two meaningful percentage limits. It is deliberately not a dashboard: no charts, costs, tokens, history, notifications, or Dock icon.
+UsageBar shows **remaining** quota for one selected provider, with at most two meaningful percentage limits. The menu bar always prefixes the active provider, while the dropdown contains compact cached summaries for connected providers with truthful quota data. It is deliberately not a dashboard: no charts, costs, tokens, history, notifications, or Dock icon.
 
 ## Providers
 

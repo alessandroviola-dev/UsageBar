@@ -3,12 +3,17 @@ import Foundation
 protocol UsageProvider: Sendable {
     var id: String { get }
     var displayName: String { get }
+    var statusName: String { get }
     var allowedHosts: [String] { get }
 
     func connectionStatus() async -> ProviderConnectionStatus
     func connect() async throws
     func disconnect() async throws
     func fetchUsage() async throws -> UsageSnapshot
+}
+
+extension UsageProvider {
+    var statusName: String { displayName }
 }
 
 enum ProviderError: LocalizedError, Sendable {
