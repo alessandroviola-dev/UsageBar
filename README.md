@@ -8,9 +8,9 @@ UsageBar shows **remaining** quota for one selected provider, with at most two m
 
 ## Providers
 
-v0.1.0 supports Codex and OpenRouter. Codex uses its official local `app-server` RPC (`account/rateLimits/read`). The app does not read Codex sessions, prompts, conversations, or authentication files. It asks the already-authenticated official CLI for its non-billable rate-limit snapshot every 60 seconds, plus on manual refresh or provider selection.
+v0.1.0 auto-detects local Codex, Claude Code, Gemini CLI, GitHub Copilot, Cursor, and OpenCode installations. Codex uses its official local `app-server` RPC (`account/rateLimits/read`); GitHub Copilot reuses the official authenticated `gh` CLI through its non-billable account snapshot. Tools without a safe quota source are clearly shown as not installed, needing login, or quota unavailable rather than guessed. The app does not read Codex sessions, prompts, conversations, or authentication files. It asks the already-authenticated official CLI for its non-billable rate-limit snapshot every 60 seconds, plus on manual refresh or provider selection.
 
-OpenRouter can be connected from the Providers window with an API key. Its documented non-billable credits endpoint supplies purchased and consumed credit, so its `Credits XX%` value has a real denominator. Other providers are only listed where no safe truthful adapter is implemented.
+OpenRouter can be connected from the Providers window with an API key. Use **Rescan Providers** in that window after installing or signing in to a local tool. Its documented non-billable credits endpoint supplies purchased and consumed credit, so its `Credits XX%` value has a real denominator. Other providers are only listed where no safe truthful adapter is implemented.
 
 The menu-bar labels derive from the reported window duration, so a 300-minute window becomes `5H` and a 10080-minute window becomes `7D`. Values are `100 - used_percent`, clamped to `0...100`.
 

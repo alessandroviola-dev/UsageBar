@@ -60,14 +60,13 @@ final class ProvidersWindowController: NSWindowController {
             }
             stack.addArrangedSubview(row)
         }
+        stack.addArrangedSubview(button("Rescan Providers", action: #selector(rescan)))
     }
 
     private func detailText(for provider: any UsageProvider) -> String {
-        if provider.id == monitor.activeProviderID { return "Selected" }
-        if provider.id == "codex" { return "Local CLI" }
         if isConnected(provider.id) { return UserDefaults.standard.string(forKey: "accountLabel.\(provider.id).default") ?? "Connected" }
-        if provider is any APIKeyProvider { return "Not connected" }
-        return "Not available"
+        if provider is any APIKeyProvider { return LocalProviderDiscovery().state(for: provider.id).description }
+        return LocalProviderDiscovery().state(for: provider.id).description
     }
 
     private func isConnected(_ providerID: String) -> Bool {
@@ -89,6 +88,7 @@ final class ProvidersWindowController: NSWindowController {
     }
 
     @objc private func useCodex() { monitor.select(providerID: "codex"); rebuildRows() }
+    @objc private func rescan() { rebuildRows() }
 
     @objc private func addKey(_ sender: NSButton) {
         let id = sender.tag == 1 ? "openrouter" : ""

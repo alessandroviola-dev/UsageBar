@@ -7,11 +7,11 @@ struct ProviderRegistry {
         if let providers { self.providers = providers; return }
         self.providers = [
             CodexProvider(),
-            UnavailableProvider(id: "claude-code", displayName: "Claude Code", reason: "No safe quota source is implemented yet."),
-            UnavailableProvider(id: "cursor", displayName: "Cursor", reason: "No safe quota source is implemented yet."),
-            UnavailableProvider(id: "github-copilot", displayName: "GitHub Copilot", reason: "No safe quota source is implemented yet."),
-            UnavailableProvider(id: "gemini-cli", displayName: "Gemini CLI", reason: "No safe quota source is implemented yet."),
-            UnavailableProvider(id: "opencode", displayName: "OpenCode", reason: "No safe quota source is implemented yet."),
+            LocalToolProvider(id: "claude-code", displayName: "Claude Code"),
+            LocalToolProvider(id: "cursor", displayName: "Cursor"),
+            CopilotProvider(),
+            LocalToolProvider(id: "gemini-cli", displayName: "Gemini CLI"),
+            LocalToolProvider(id: "opencode", displayName: "OpenCode"),
             OpenRouterProvider(),
             UnavailableProvider(id: "openai-api", displayName: "OpenAI API", reason: "API spend is not a quota percentage without a configured cap."),
             UnavailableProvider(id: "anthropic-api", displayName: "Anthropic API", reason: "API spend is not a quota percentage without a configured cap."),

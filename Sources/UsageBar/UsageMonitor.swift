@@ -21,6 +21,9 @@ final class UsageMonitor {
         self.defaults = defaults
         let stored = defaults.string(forKey: "selectedProviderID")
         activeProviderID = registry.provider(id: stored ?? "") == nil ? "codex" : stored!
+        // One bounded discovery pass at startup; no filesystem polling occurs during refresh.
+        let discovery = LocalProviderDiscovery()
+        _ = registry.providers.map { discovery.state(for: $0.id) }
     }
 
     deinit { refreshTask?.cancel() }
