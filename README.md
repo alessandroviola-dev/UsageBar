@@ -10,9 +10,11 @@ UsageBar shows **remaining** quota for one selected provider, with at most two m
 
 ## Providers
 
-v0.1.0 auto-detects local Codex, Claude Code, Gemini CLI, GitHub Copilot, Cursor, and OpenCode installations. Codex uses its official local `app-server` RPC (`account/rateLimits/read`); GitHub Copilot reuses the official authenticated `gh` CLI through its non-billable account snapshot. Tools without a safe quota source are clearly shown as not installed, needing login, or quota unavailable rather than guessed. The app does not read Codex sessions, prompts, conversations, or authentication files. It asks the selected authenticated provider for a non-billable quota snapshot every 60 seconds, plus on manual refresh or provider selection.
+v0.1.0 auto-detects local Codex, Claude Code, Gemini CLI, GitHub Copilot, Cursor, and OpenCode installations. Codex uses its official local `app-server` RPC (`account/rateLimits/read`); GitHub Copilot reuses the authenticated `gh` CLI to retrieve quota data. Tools without a safe quota source are clearly shown as not installed, needing login, or quota unavailable rather than guessed.
 
-OpenRouter can be connected from the Providers window with an API key. Use **Rescan Providers** in that window after installing or signing in to a local tool. Its documented non-billable credits endpoint supplies purchased and consumed credit, so its `Credits XX%` value has a real denominator. Other providers are only listed where no safe truthful adapter is implemented.
+The app does not read Codex sessions, prompts, conversations, or authentication files. It asks the selected authenticated provider for a non-billable quota snapshot every 60 seconds, plus on manual refresh or provider selection.
+
+OpenRouter can be connected from the Providers window with an API key. Use **Rescan Providers** after installing or signing in to a local tool. Its credits endpoint supplies purchased and consumed credit, so `Credits XX%` has a real denominator. Other providers are only listed where no safe truthful adapter is implemented.
 
 The menu-bar labels derive from the reported window duration, so a 300-minute window becomes `5H` and a 10080-minute window becomes `7D`. Values are `100 - used_percent`, clamped to `0...100`.
 
@@ -29,11 +31,14 @@ See [PROVIDERS.md](PROVIDERS.md) for truthful provider status.
 ## Install
 
 ```bash
-cd <project-root>sageBar
+git clone https://github.com/Ilcoach/UsageBar.git
+cd UsageBar
 ./install.sh
 ```
 
-This creates `~/Applications/UsageBar.app`, validates its plists, ad-hoc signs it, safely replaces a previous UsageBar installation, and launches it. To remove it:
+This creates `~/Applications/UsageBar.app`, validates its plists, ad-hoc signs it, safely replaces a previous UsageBar installation, and launches it.
+
+## Uninstall
 
 ```bash
 ./uninstall.sh
@@ -47,3 +52,15 @@ The interactive uninstaller asks about UsageBar-created Keychain entries. Non-in
 swift test
 swift build -c release --arch arm64
 ```
+
+See `TESTING.md` for the executed validation matrix.
+
+## Limitations
+
+- Provider quota interfaces can change over time; Codex app-server and GitHub Copilot quota behavior may require future adapter updates.
+- OpenRouter is implemented but was not live-tested without a user-supplied API key.
+- Claude Code, Gemini CLI, Cursor, OpenCode, and other listed providers are only shown when UsageBar can report a truthful supported state; unsupported quota data is never fabricated.
+
+## License
+
+MIT.
