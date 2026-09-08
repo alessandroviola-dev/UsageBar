@@ -8,7 +8,7 @@ Results are recorded only when actually run.
 | Release arm64 build | PASS | `swift build -c release --arch arm64`. |
 | Unit tests | PASS | 10 XCTest tests: normalization, clamping, labels, reset text, menu text, unavailable provider, isolated Keychain round-trip, and authenticated live Codex app-server retrieval. |
 | Codex live retrieval | PASS | Existing authenticated Codex CLI returned primary and secondary rate-limit windows through `account/rateLimits/read`; no prompt was sent. |
-| Independent Codex comparison | NOT TESTED | A second independent authoritative source was not safely available during this run. Do not treat this as release acceptance parity. |
+| Independent Codex comparison | PASS | Manual comparison against OpenUsage on 2026-09-08 showed the same live remaining quotas: 5H 69%, 7D 85%. |
 | Automatic 60-second refresh | NOT TESTED | Implemented; requires a 60-second UI observation. |
 | Manual refresh | NOT TESTED | Implemented; requires UI observation. |
 | Provider switching | NOT TESTED | Implemented; requires UI observation. |
@@ -26,7 +26,7 @@ Results are recorded only when actually run.
 
 ## Codex live record
 
-The safe validation command sent only `initialize` and `account/rateLimits/read` to the existing official local Codex app-server. Its most recent validation returned a 300-minute primary window at 30% used (70% remaining) and a 10080-minute secondary window at 15% used (85% remaining). No account identifier, token, header, or complete payload is recorded.
+The safe validation command sent only `initialize` and `account/rateLimits/read` to the existing official local Codex app-server. Its earlier automated validation returned a 300-minute primary window at 30% used (70% remaining) and a 10080-minute secondary window at 15% used (85% remaining). No account identifier, token, header, or complete payload is recorded.
 
 ```text
 Codex authoritative (official local app-server):
@@ -38,6 +38,20 @@ Codex authoritative (official local app-server):
 UsageBar normalization:
 5H 70%
 7D 85%
-
-Independent-source result: NOT TESTED
 ```
+
+A subsequent manual independent comparison was performed while OpenUsage and UsageBar were both visible in the macOS menu bar:
+
+```text
+OpenUsage:
+5H remaining: 69%
+7D remaining: 85%
+
+UsageBar:
+5H remaining: 69%
+7D remaining: 85%
+
+Independent-source result: PASS
+```
+
+The one-point change in the 5-hour window between the automated record and the later manual comparison reflects normal usage between samples; the independently observed values matched exactly at comparison time.
