@@ -1,12 +1,12 @@
 # UsageBar — Local Account Auto-Detection Phase
 
-Work in the existing UsageBar project. Do not redesign the UI and do not modify FreeBar or RamBar.
+Work in the existing UsageBar project. Do not modify FreeBar or RamBar.
 
 ## Product correction
 
 UsageBar must behave like OpenUsage in one important respect: **auto-detect AI tools/accounts already authenticated on the Mac and reuse that existing login whenever safely possible.**
 
-Do not require the user to obtain API keys for services they already use through an authenticated official CLI/desktop app.
+Do not require API keys for services already used through an authenticated official CLI/desktop app.
 
 The current Codex implementation is the reference behavior:
 
@@ -15,11 +15,110 @@ The current Codex implementation is the reference behavior:
 - do not copy credentials
 - do not read conversations
 - do not ask the user to sign in again
-- display only the normalized remaining quota
+- display only normalized remaining quota
 
-API-key entry remains available only for providers whose legitimate integration genuinely requires an API key.
+API-key entry remains only for providers whose legitimate integration genuinely requires one.
 
-## 1. Auto-discovery
+## 1. Status-bar behavior — IMPORTANT
+
+The provider name MUST always be visible in the macOS menu bar so the user immediately knows which quota is being shown.
+
+Examples:
+
+```text
+Codex 5H 53% | 7D 82%
+Claude 5H 68% | 7D 91%
+Gemini Daily 74%
+Copilot Premium 61%
+OpenRouter Credits 83%
+```
+
+Do not show an unlabeled value such as:
+
+```text
+5H 53% | 7D 82%
+```
+
+The provider label should be concise and human-readable:
+
+- `Codex`
+- `Claude`
+- `Gemini`
+- `Copilot`
+- `Cursor`
+- `OpenCode`
+- `OpenRouter`
+
+Do not include the account name in the menu-bar title unless required to disambiguate two accounts of the same provider.
+
+## 2. Multiple providers
+
+UsageBar must support multiple connected/detected providers simultaneously, but the menu bar shows only ONE **active provider** at a time.
+
+Never concatenate every provider into one huge status title.
+
+Example with four connected providers:
+
+```text
+Menu bar:
+Codex 5H 53% | 7D 82%
+```
+
+Clicking UsageBar should show a compact summary of all connected providers:
+
+```text
+Codex      5H 53% | 7D 82%
+Claude     5H 68% | 7D 91%
+Gemini     Daily 74%
+Copilot    Premium 61%
+
+Switch Provider >
+Providers…
+Refresh
+Launch at Login
+----------------
+Quit UsageBar
+```
+
+The summary should include only providers for which UsageBar has a meaningful current quota value. Detected providers without a usable quota may appear in `Providers…` but should not clutter the main menu summary.
+
+`Switch Provider >` lists available connected providers/accounts. Selecting one immediately makes it the active provider and updates the menu-bar title.
+
+Persist the active provider/account identifier in UserDefaults. Never store secrets there.
+
+If the active provider becomes unavailable or logged out:
+
+- keep the last successful value for a sensible stale period
+- indicate the error in the dropdown
+- do not silently switch providers unless there is no longer a valid active provider
+- if a fallback selection is required, pick another connected provider deterministically and document the behavior
+
+## 3. Multiple accounts for the same provider
+
+Design identities so multiple accounts remain possible, for example:
+
+```text
+Codex Personal
+Codex Work
+```
+
+The dropdown / Providers window must distinguish them.
+
+The menu bar may remain compact:
+
+```text
+Codex 5H 53% | 7D 82%
+```
+
+If two accounts of the same provider are simultaneously configured and ambiguity would be harmful, use a short account label, for example:
+
+```text
+Codex Work 5H 53% | 7D 82%
+```
+
+Do not expose emails or account IDs in the menu-bar title by default.
+
+## 4. Auto-discovery
 
 Implement a small `LocalProviderDiscovery` layer.
 
@@ -39,12 +138,12 @@ Detect at minimum:
 - Claude Code: `claude`
 - Gemini CLI: `gemini`
 - GitHub Copilot: standalone `copilot`, and `gh` where relevant
-- Cursor: installed application/CLI and its known local state
+- Cursor: installed application/CLI and known local state
 - OpenCode if installed
 
-A detected tool is not automatically `FULL`; it means UsageBar should attempt its safe quota adapter.
+A detected tool is not automatically FULL; it means UsageBar should attempt its safe quota adapter.
 
-## 2. Provider states
+## 5. Provider states
 
 Replace generic `UnavailableProvider` placeholders with truthful dynamic states:
 
@@ -54,8 +153,6 @@ Replace generic `UnavailableProvider` placeholders with truthful dynamic states:
 - `Needs API key`
 - `Needs login`
 - `Unsupported`
-
-The Providers UI should explain the real reason instead of simply saying unavailable.
 
 Example:
 
@@ -69,7 +166,7 @@ OpenRouter       Needs API key
 
 Keep the UI minimal and native.
 
-## 3. Codex
+## 6. Codex
 
 Keep the existing implementation based on the official short-lived:
 
@@ -83,7 +180,11 @@ Do not regress it.
 
 Codex has already passed independent comparison against OpenUsage.
 
-## 4. Claude Code — high priority
+Expected title style:
+
+`Codex 5H XX% | 7D YY%`
+
+## 7. Claude Code — high priority
 
 Inspect the CURRENT OpenUsage implementation under:
 
@@ -91,62 +192,54 @@ Inspect the CURRENT OpenUsage implementation under:
 
 and Claude Code's current official/local interfaces.
 
-OpenUsage currently has a live Usage API path in addition to local statistics. Determine the exact current authentication source and endpoint rather than assuming Claude quota must be derived from conversation logs.
+Determine the exact current authentication source and authoritative usage/quota source rather than deriving quota from conversation logs.
 
 Preferred order:
 
-1. official Claude CLI command/RPC that returns usage/quota, if currently available
+1. official Claude CLI command/RPC exposing usage/quota
 2. official account/usage endpoint using the CLI's existing authenticated state, read only in memory
 3. minimal local account metadata if it contains authoritative quota
 
-Do **not** parse prompt or conversation text merely to estimate quota.
+Do not parse prompt or conversation text merely to estimate quota.
 
-If a local credential/token must be read because the official CLI stores authentication locally:
+If a local credential/token must be read:
 
-- read only the minimum credential material needed
-- keep it in memory only
-- never copy it into UsageBar Keychain
+- minimum material only
+- memory only
+- never copy to UsageBar Keychain
 - never print/log it
-- never commit it
-- send it only to Anthropic/Claude's expected host
+- send only to Anthropic/Claude expected hosts
 
-If an authoritative percentage/reset can be retrieved, implement a real `ClaudeCodeProvider` and mark FULL after live validation.
+If an authoritative percentage/reset can be retrieved, implement a real `ClaudeCodeProvider` and mark FULL after validation. Otherwise show `Detected — quota unavailable`.
 
-If not, show `Detected — quota unavailable`; do not fabricate a 5-hour percentage from token history.
-
-## 5. Gemini CLI — high priority
+## 8. Gemini CLI — high priority
 
 Inspect the CURRENT OpenUsage Gemini CLI provider.
 
-Known current OpenUsage behavior uses:
+Known relevant behavior includes:
 
 - `gemini` binary + `~/.gemini/`
 - existing OAuth state
 - optional Google Cloud Code endpoints
 - `loadCodeAssist`
 - `retrieveUserQuota`
+- `https://cloudcode-pa.googleapis.com/v1internal/`
 
-The relevant quota service currently uses:
-
-`https://cloudcode-pa.googleapis.com/v1internal/`
-
-and can return quota buckets containing remaining fractions.
-
-Implement only the minimum necessary path for UsageBar:
+Implement only the minimum needed for quota:
 
 - detect existing Gemini CLI login
-- obtain quota through the existing OAuth account when possible
+- obtain quota through existing OAuth when possible
 - refresh OAuth only through Google's legitimate token endpoint when required
 - do not read conversation/session bodies
-- do not collect token history, MCP configuration, install IDs, etc.
+- do not collect token history, MCP config, install IDs, etc.
 
-If a Google Cloud project is required, first attempt the existing CLI settings/environment. If none exists, show a concise provider state explaining what is missing; do not invent a project.
+If a Google Cloud project is required, first inspect existing CLI settings/environment. If missing, show `Needs config`; do not invent a project.
 
-Never copy Gemini's existing refresh/access token into UsageBar Keychain.
+Never duplicate Gemini OAuth tokens into UsageBar Keychain.
 
-## 6. GitHub Copilot — high priority
+## 9. GitHub Copilot — high priority
 
-Inspect the CURRENT OpenUsage Copilot implementation and the currently installed GitHub/Copilot tooling.
+Inspect the CURRENT OpenUsage Copilot implementation and installed GitHub/Copilot tooling.
 
 Discovery should consider:
 
@@ -156,60 +249,52 @@ Discovery should consider:
 
 Prefer an official CLI/account command if it exposes quota.
 
-OpenUsage currently uses GitHub authentication via `gh` for quota access and has historically used a Copilot account endpoint. Re-evaluate the current implementation rather than hard-coding an old endpoint.
-
 If `gh` can act as the authenticated gateway, prefer a short-lived `gh` invocation over extracting/copying its token.
 
-Do not parse coding-session contents unless quota snapshots are the only safe source; even then read only the quota event fields, not prompts/messages.
+Do not parse coding-session contents unless quota snapshots are genuinely the only safe source; if necessary read only quota event fields, never prompts/messages.
 
-If a real chat/completions/premium quota is obtained, normalize the most useful one or two windows and mark FULL only after live validation.
+If a real chat/completions/premium quota is available, normalize the most useful one or two limits and validate before marking FULL.
 
-## 7. Cursor — high priority
+## 10. Cursor — high priority
 
 Inspect the CURRENT OpenUsage Cursor implementation.
 
-Detection may use the local Cursor application state and known SQLite databases in **read-only** mode.
-
-OpenUsage currently detects Cursor account state from its local application database. UsageBar may use equivalent local state only when necessary to talk directly to Cursor's own account/quota service.
+Detection may use local Cursor application state and known SQLite databases in **read-only** mode.
 
 Rules:
 
-- open databases read-only
+- databases read-only
 - retrieve only account/auth/quota-related keys
 - do not inspect conversations, Composer content, prompts, projects or code
 - token stays in memory only
-- token is sent only to a verified Cursor-owned endpoint
-- no credential is copied to UsageBar Keychain
+- token sent only to verified Cursor-owned endpoints
+- no credential copied to UsageBar Keychain
 
-Find the CURRENT quota endpoint/semantics from OpenUsage/current Cursor behavior; do not guess.
+Find CURRENT quota endpoint/semantics; do not guess.
 
-If a reliable quota denominator exists, implement it. Otherwise show `Detected — quota unavailable`.
+If a reliable denominator exists, implement it. Otherwise show `Detected — quota unavailable`.
 
-## 8. OpenCode and additional locally authenticated tools
+## 11. OpenCode and additional local tools
 
-After the four priority adapters above, inspect the current OpenUsage provider/detection registry for other tools that can be auto-detected safely.
+After the priority adapters, inspect the current OpenUsage detection/provider registry for other tools that can be auto-detected safely.
 
-Only implement adapters that provide a truthful quota/allowance relevant to the question:
+Only implement adapters that answer:
 
 **How much usage do I have left?**
 
-Do not port cost, token, history, model or session features.
+Do not port cost, token history, sessions, models, projects, burn rate or dashboard features.
 
-## 9. API-key providers
+## 12. API-key providers
 
 Keep API-key adapters separate from local-login adapters.
 
-OpenRouter is optional. The user does not currently have an OpenRouter API key, so OpenRouter live validation is **not a release blocker**.
+OpenRouter is optional. The user does not currently have an OpenRouter API key, so OpenRouter live validation is NOT a release blocker.
 
-Do not require OpenRouter or any other API-key service in order to call UsageBar complete for locally authenticated providers.
+Do not require OpenRouter or any other API-key provider to call the locally authenticated core complete.
 
-Providers such as OpenAI API / Anthropic API may remain `Needs API key` or `Unsupported` if there is no meaningful global percentage quota.
+Do not confuse ChatGPT/Claude subscription login with API billing credentials.
 
-Do not confuse a ChatGPT/Claude subscription login with an API billing key.
-
-## 10. Security model for existing local accounts
-
-Important distinction:
+## 13. Security model
 
 ### UsageBar-created secret
 
@@ -223,33 +308,50 @@ Example: Codex/Claude/Gemini/Cursor/GitHub login already owned by its official t
 
 Do NOT migrate or duplicate it into UsageBar Keychain.
 
-Use it through the official CLI/RPC if possible. If direct read access is absolutely required, use read-only/in-memory access and document exactly why.
+Use official CLI/RPC where possible. If direct read access is unavoidable, use read-only/in-memory access and document why.
 
 Never modify provider auth files.
-
 Never log secrets.
 
-## 11. Networking
+For direct HTTP networking, define strict provider-specific host allowlists.
 
-For every provider that performs direct HTTP networking, define a strict provider-specific host allowlist.
+No credential may ever be sent to another provider's host.
 
-No credential may ever be sent to a host belonging to another provider.
+## 14. Discovery / Providers UI
 
-Record expected hosts in `PROVIDERS.md` without recording URLs containing secrets.
-
-## 12. Provider discovery UI
-
-Add one compact menu command under Providers:
+Add:
 
 `Rescan Providers`
 
-Do not add a permanent dashboard.
+Auto-detected authenticated providers should normally require no manual `Connect` action; they should appear as Connected after successful validation.
 
-Auto-detected providers should appear automatically.
+The Providers window must distinguish:
 
-Where possible the user should not have to click `Connect` at all for an already authenticated CLI. It should simply show `Connected` after successful validation.
+- installed vs not installed
+- logged in vs logged out
+- quota available vs unavailable
+- manual API key required
+- unsupported
 
-## 13. Tests
+The normal menu is NOT a dashboard. Keep the multi-provider quota summary compact.
+
+## 15. Refresh policy with multiple providers
+
+The active provider remains the highest priority and should refresh on the existing cadence.
+
+For other connected providers shown in the dropdown summary:
+
+- do not hammer every provider every 60 seconds if that would be wasteful
+- use sensible provider-specific caching/TTL
+- refresh when the menu opens if stale
+- refresh immediately when selected as active
+- respect rate limits and Retry-After
+
+The menu should never block while all providers refresh. Use cached values and update asynchronously.
+
+Prevent stale async responses from an old provider selection overwriting the new active provider title.
+
+## 16. Tests
 
 Add tests for:
 
@@ -257,21 +359,27 @@ Add tests for:
 - known binary paths
 - detected but logged-out state
 - detected and logged-in state
-- no duplicate providers after repeated rescans
+- no duplicate providers after rescans
 - local credentials never copied into UsageBar Keychain
 - provider host allowlists
 - malformed quota responses
 - expired OAuth behavior where applicable
-- account logout while UsageBar is running
-- provider installation after UsageBar startup followed by rescan
+- account logout while UsageBar runs
+- installation after startup + rescan
+- status title always includes provider label
+- active provider switching changes title
+- multiple providers appear in dropdown summary
+- disconnected/no-quota providers do not pollute the main quota summary
+- multiple accounts of one provider remain distinguishable
+- stale response from provider A cannot overwrite provider B after switching
 
-Use fake HOME/config fixtures for unit tests. Never include real tokens.
+Use fake HOME/config fixtures. Never include real tokens.
 
-## 14. Live validation on this Mac
+## 17. Live validation on this Mac
 
-Without asking the user for credentials, discover which supported local tools are actually installed/authenticated on this development Mac.
+Without asking for credentials, discover which supported local tools are installed/authenticated.
 
-For each detected account, report:
+For each detected account report:
 
 ```text
 Provider:
@@ -283,27 +391,31 @@ Validation source:
 Result: PASS/PARTIAL/UNSUPPORTED
 ```
 
-Do not expose account IDs, emails, access tokens or refresh tokens in the final report.
+Do not expose account IDs, emails, access tokens or refresh tokens.
 
 If a tool is not installed, that is not a project failure.
 
-## 15. PROVIDERS.md semantics
+Also validate the multi-provider UX with every connected provider found on this Mac:
 
-Change status meaning to distinguish implementation support from this Mac's installed state.
+- menu-bar title includes active provider name
+- switching provider updates title correctly
+- dropdown shows concise current quotas for all connected providers with usable quota
 
-Recommended columns:
+## 18. PROVIDERS.md semantics
+
+Use columns:
 
 ```text
 Provider | Auto-detection | Auth reuse | Quota source | Implementation | This Mac
 ```
 
-Implementation values:
+Implementation:
 
 - FULL
 - PARTIAL
 - UNSUPPORTED
 
-`This Mac` values:
+This Mac:
 
 - CONNECTED
 - LOGGED OUT
@@ -311,24 +423,28 @@ Implementation values:
 - NEEDS CONFIG
 - NOT TESTED
 
-Do not mark an adapter UNSUPPORTED merely because the corresponding app is not installed on this Mac.
+Do not mark implementation UNSUPPORTED merely because the app is absent from this Mac.
 
-## 16. Completion criteria
+## 19. Completion criteria
 
 This phase is complete when:
 
 1. Codex still passes.
-2. UsageBar automatically discovers supported local AI tools.
-3. Existing provider logins are reused without manual API keys where technically possible.
-4. Providers screen clearly distinguishes not-installed vs not-logged-in vs unsupported.
-5. At least Claude Code, Gemini CLI, Copilot and Cursor have been technically investigated against current implementations, not left as generic placeholders.
-6. Any adapter marked FULL has a real quota denominator and live or fixture-backed validation.
-7. No conversation content is needed for normal quota operation.
-8. Provider credentials are never duplicated unnecessarily.
-9. Tests/build/install remain green.
-10. FreeBar and RamBar are untouched.
+2. The menu-bar title always identifies the active provider.
+3. Multiple connected providers can coexist without creating an excessively long menu-bar title.
+4. The dropdown gives a concise quota summary for all connected providers with meaningful quota.
+5. Switching active provider updates the title immediately and safely.
+6. UsageBar automatically discovers supported local AI tools.
+7. Existing provider logins are reused without manual API keys where technically possible.
+8. Providers UI distinguishes not-installed vs logged-out vs unsupported vs quota-unavailable.
+9. Claude Code, Gemini CLI, Copilot and Cursor are technically investigated against current implementations, not generic placeholders.
+10. Any adapter marked FULL has a real quota denominator and validation.
+11. No conversation content is needed for normal quota operation.
+12. Provider credentials are never duplicated unnecessarily.
+13. Tests/build/install remain green.
+14. FreeBar and RamBar are untouched.
 
-## 17. Git
+## 20. Git
 
 Keep repository PRIVATE during this phase.
 
@@ -337,16 +453,16 @@ After successful work:
 - update README.md
 - update PROVIDERS.md
 - update TESTING.md
-- remove obsolete generic `UnavailableProvider` entries where dynamic detection now applies
+- remove obsolete generic placeholders where dynamic detection applies
 - run secret scan
 - commit
 - push `main`
 
 Suggested commit message:
 
-`Add local provider auto-detection`
+`Add local provider auto-detection and switching`
 
-## 18. Final handoff
+## 21. Final handoff
 
 Return:
 
@@ -354,16 +470,19 @@ Return:
 PASS / PARTIAL / BLOCKED
 
 ### AUTO-DETECTED ON THIS MAC
-List provider names and CONNECTED / LOGGED OUT / NOT INSTALLED / NEEDS CONFIG.
+List providers and CONNECTED / LOGGED OUT / NOT INSTALLED / NEEDS CONFIG.
 
 ### FULL PROVIDERS
 List implementations that can truthfully display remaining quota.
 
-### DISPLAY
-Current UsageBar text.
+### ACTIVE DISPLAY
+Exact current menu-bar text, including provider name.
+
+### MULTI-PROVIDER MENU
+List the concise quota rows currently shown for every connected provider.
 
 ### AUTH REUSE
-For each connected provider, state only the mechanism (CLI RPC / local OAuth / read-only app state / Keychain API key). Do not expose identifiers.
+For each connected provider, mechanism only: CLI RPC / local OAuth / read-only app state / Keychain API key.
 
 ### TESTS
 Exact count and failures.
