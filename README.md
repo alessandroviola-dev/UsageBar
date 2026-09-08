@@ -6,9 +6,11 @@ A tiny native macOS menu-bar utility for AI usage limits.
 
 UsageBar shows **remaining** quota for one selected provider, with at most two meaningful percentage limits. The menu bar always prefixes the active provider, while the dropdown contains compact cached summaries for connected providers with truthful quota data. It is deliberately not a dashboard: no charts, costs, tokens, history, notifications, or Dock icon.
 
+**v0.1.0 status: PASS.** Codex and GitHub Copilot are live-validated on the development Mac; OpenRouter support is implemented but optional and requires a user-supplied API key.
+
 ## Providers
 
-v0.1.0 auto-detects local Codex, Claude Code, Gemini CLI, GitHub Copilot, Cursor, and OpenCode installations. Codex uses its official local `app-server` RPC (`account/rateLimits/read`); GitHub Copilot reuses the official authenticated `gh` CLI through its non-billable account snapshot. Tools without a safe quota source are clearly shown as not installed, needing login, or quota unavailable rather than guessed. The app does not read Codex sessions, prompts, conversations, or authentication files. It asks the already-authenticated official CLI for its non-billable rate-limit snapshot every 60 seconds, plus on manual refresh or provider selection.
+v0.1.0 auto-detects local Codex, Claude Code, Gemini CLI, GitHub Copilot, Cursor, and OpenCode installations. Codex uses its official local `app-server` RPC (`account/rateLimits/read`); GitHub Copilot reuses the official authenticated `gh` CLI through its non-billable account snapshot. Tools without a safe quota source are clearly shown as not installed, needing login, or quota unavailable rather than guessed. The app does not read Codex sessions, prompts, conversations, or authentication files. It asks the selected authenticated provider for a non-billable quota snapshot every 60 seconds, plus on manual refresh or provider selection.
 
 OpenRouter can be connected from the Providers window with an API key. Use **Rescan Providers** in that window after installing or signing in to a local tool. Its documented non-billable credits endpoint supplies purchased and consumed credit, so its `Credits XX%` value has a real denominator. Other providers are only listed where no safe truthful adapter is implemented.
 
@@ -19,7 +21,7 @@ See [PROVIDERS.md](PROVIDERS.md) for truthful provider status.
 ## Security and privacy
 
 - OpenRouter API keys entered in the Providers window use the macOS Keychain, never UserDefaults or files.
-- Existing CLI credentials are not copied; Codex authentication remains owned by the official CLI.
+- Existing Codex and GitHub CLI credentials are not copied; authentication remains owned by the official provider tools.
 - Credentials never leave the Mac except directly to their configured provider.
 - There is no UsageBar server, telemetry, analytics, tracking, backend, or remote sync.
 - UsageBar makes no billable AI generation request to discover a quota.
