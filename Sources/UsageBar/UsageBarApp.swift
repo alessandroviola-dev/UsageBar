@@ -6,6 +6,7 @@ import ServiceManagement
 final class UsageBarApp: NSObject, NSApplicationDelegate {
     private var monitor: UsageMonitor?
     private var statusBar: StatusBarController?
+    private var wakeObserver: NSObjectProtocol?
 
     static func main() {
         // These maintenance modes are used only by uninstall.sh; they do not touch CLI credentials.
@@ -29,5 +30,12 @@ final class UsageBarApp: NSObject, NSApplicationDelegate {
         self.monitor = monitor
         statusBar = StatusBarController(monitor: monitor)
         monitor.start()
+        wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak monitor] _ in
+            Task { @MainActor in monitor?.refresh(manual: true) }
+        }
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        if let wakeObserver { NSWorkspace.shared.notificationCenter.removeObserver(wakeObserver) }
     }
 }

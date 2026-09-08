@@ -6,9 +6,11 @@ A tiny native macOS menu-bar utility for AI usage limits.
 
 UsageBar shows **remaining** quota for one selected provider, with at most two meaningful percentage limits. It is deliberately not a dashboard: no charts, costs, tokens, history, notifications, or Dock icon.
 
-## Codex
+## Providers
 
-v0.1.0 supports Codex through its official local `app-server` RPC (`account/rateLimits/read`). The app does not read Codex sessions, prompts, conversations, or authentication files. It asks the already-authenticated official CLI for its non-billable rate-limit snapshot every 60 seconds, plus on manual refresh or provider selection.
+v0.1.0 supports Codex and OpenRouter. Codex uses its official local `app-server` RPC (`account/rateLimits/read`). The app does not read Codex sessions, prompts, conversations, or authentication files. It asks the already-authenticated official CLI for its non-billable rate-limit snapshot every 60 seconds, plus on manual refresh or provider selection.
+
+OpenRouter can be connected from the Providers window with an API key. Its documented non-billable credits endpoint supplies purchased and consumed credit, so its `Credits XX%` value has a real denominator. Other providers are only listed where no safe truthful adapter is implemented.
 
 The menu-bar labels derive from the reported window duration, so a 300-minute window becomes `5H` and a 10080-minute window becomes `7D`. Values are `100 - used_percent`, clamped to `0...100`.
 
@@ -16,7 +18,7 @@ See [PROVIDERS.md](PROVIDERS.md) for truthful provider status.
 
 ## Security and privacy
 
-- API keys entered by future API-key adapters use the macOS Keychain, never UserDefaults or files.
+- OpenRouter API keys entered in the Providers window use the macOS Keychain, never UserDefaults or files.
 - Existing CLI credentials are not copied; Codex authentication remains owned by the official CLI.
 - Credentials never leave the Mac except directly to their configured provider.
 - There is no UsageBar server, telemetry, analytics, tracking, backend, or remote sync.

@@ -15,12 +15,18 @@ enum ProviderError: LocalizedError, Sendable {
     case unavailable(String)
     case malformedResponse
     case commandFailed
+    case authenticationFailed
+    case rateLimited(retryAfter: Date?)
+    case network
 
     var errorDescription: String? {
         switch self {
         case .unavailable(let message): return message
         case .malformedResponse: return "The provider returned an invalid usage response."
         case .commandFailed: return "The provider usage service could not be started."
+        case .authenticationFailed: return "The provider rejected the credential."
+        case .rateLimited: return "The provider asked UsageBar to retry later."
+        case .network: return "The provider request failed."
         }
     }
 }

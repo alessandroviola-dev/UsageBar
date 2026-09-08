@@ -69,7 +69,7 @@ final class StatusBarController: NSObject {
         statusItem.menu = menu
     }
 
-    @objc private func refresh() { monitor.refresh() }
+    @objc private func refresh() { monitor.refresh(manual: true) }
     @objc private func selectProvider(_ sender: NSMenuItem) {
         if let id = sender.representedObject as? String { monitor.select(providerID: id) }
     }

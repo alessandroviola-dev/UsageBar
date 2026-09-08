@@ -7,12 +7,7 @@ final class ProvidersWindowController: NSWindowController {
 
     init(monitor: UsageMonitor) {
         self.monitor = monitor
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 420, height: 360),
-            styleMask: [.titled, .closable],
-            backing: .buffered,
-            defer: false
-        )
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 440, height: 440), styleMask: [.titled, .closable], backing: .buffered, defer: false)
         window.title = "UsageBar Providers"
         window.isReleasedWhenClosed = false
         super.init(window: window)
@@ -33,15 +28,11 @@ final class ProvidersWindowController: NSWindowController {
             stack.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -20),
             stack.topAnchor.constraint(equalTo: content.topAnchor, constant: 20)
         ])
-        let title = label("CONNECTED", bold: true)
-        stack.addArrangedSubview(title)
+        stack.addArrangedSubview(label("PROVIDERS", bold: true))
         rebuildRows()
     }
 
-    override func showWindow(_ sender: Any?) {
-        rebuildRows()
-        super.showWindow(sender)
-    }
+    override func showWindow(_ sender: Any?) { rebuildRows(); super.showWindow(sender) }
 
     private func rebuildRows() {
         while stack.arrangedSubviews.count > 1 {
@@ -53,30 +44,97 @@ final class ProvidersWindowController: NSWindowController {
             let row = NSStackView()
             row.orientation = .horizontal
             row.alignment = .centerY
-            row.distribution = .fill
-            row.spacing = 10
+            row.spacing = 8
             let name = label(provider.displayName, bold: false)
             name.setContentHuggingPriority(.defaultLow, for: .horizontal)
             row.addArrangedSubview(name)
-            let detail = label(provider.id == monitor.activeProviderID ? "Selected" : statusText(for: provider.id), bold: false)
+            let detail = label(detailText(for: provider), bold: false)
             detail.textColor = .secondaryLabelColor
             detail.alignment = .right
             detail.setContentHuggingPriority(.required, for: .horizontal)
             row.addArrangedSubview(detail)
-            if provider.id == "codex" {
-                let button = NSButton(title: "Use", target: self, action: #selector(useCodex))
-                button.bezelStyle = .rounded
-                row.addArrangedSubview(button)
+            if provider.id == "codex" { row.addArrangedSubview(button("Use", action: #selector(useCodex))) }
+            if provider is any APIKeyProvider {
+                row.addArrangedSubview(button("Add Key", action: #selector(addKey(_:)), id: provider.id))
+                if isConnected(provider.id) { row.addArrangedSubview(button("Disconnect", action: #selector(disconnect(_:)), id: provider.id)) }
             }
             stack.addArrangedSubview(row)
         }
     }
 
-    private func statusText(for id: String) -> String { id == "codex" ? "Local CLI" : "Not available" }
+    private func detailText(for provider: any UsageProvider) -> String {
+        if provider.id == monitor.activeProviderID { return "Selected" }
+        if provider.id == "codex" { return "Local CLI" }
+        if isConnected(provider.id) { return UserDefaults.standard.string(forKey: "accountLabel.\(provider.id).default") ?? "Connected" }
+        if provider is any APIKeyProvider { return "Not connected" }
+        return "Not available"
+    }
+
+    private func isConnected(_ providerID: String) -> Bool {
+        guard providerID == "openrouter" else { return false }
+        return (try? KeychainStore.load(account: "openrouter.default")) != nil
+    }
+
+    private func button(_ title: String, action: Selector, id: String? = nil) -> NSButton {
+        let button = NSButton(title: title, target: self, action: action)
+        button.bezelStyle = .rounded
+        button.tag = id == "openrouter" ? 1 : 0
+        return button
+    }
+
     private func label(_ text: String, bold: Bool) -> NSTextField {
         let field = NSTextField(labelWithString: text)
         field.font = bold ? .boldSystemFont(ofSize: NSFont.systemFontSize) : .systemFont(ofSize: NSFont.systemFontSize)
         return field
     }
+
     @objc private func useCodex() { monitor.select(providerID: "codex"); rebuildRows() }
+
+    @objc private func addKey(_ sender: NSButton) {
+        let id = sender.tag == 1 ? "openrouter" : ""
+        guard let provider = monitor.provider(id: id) as? any APIKeyProvider else { return }
+        let name = NSTextField(string: "Personal")
+        let key = NSSecureTextField(string: "")
+        let accessory = NSStackView(views: [label("Account Name", bold: false), name, label("API Key", bold: false), key])
+        accessory.orientation = .vertical
+        accessory.alignment = .leading
+        accessory.spacing = 6
+        let alert = NSAlert()
+        alert.messageText = "Add \(provider.displayName) Key"
+        alert.informativeText = "The key is validated using a non-billable endpoint and stored only in your Keychain."
+        alert.accessoryView = accessory
+        alert.addButton(withTitle: "Connect")
+        alert.addButton(withTitle: "Cancel")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        let accountName = name.stringValue
+        let apiKey = key.stringValue
+        key.stringValue = ""
+        Task { [weak self] in
+            do {
+                try await provider.connect(accountName: accountName, apiKey: apiKey)
+                self?.monitor.select(providerID: id)
+                self?.rebuildRows()
+            } catch { self?.showError(error.localizedDescription) }
+        }
+    }
+
+    @objc private func disconnect(_ sender: NSButton) {
+        let id = sender.tag == 1 ? "openrouter" : ""
+        guard let provider = monitor.provider(id: id) else { return }
+        Task { [weak self] in
+            do {
+                try await provider.disconnect()
+                if self?.monitor.activeProviderID == id { self?.monitor.select(providerID: "codex") }
+                self?.rebuildRows()
+            } catch { self?.showError(error.localizedDescription) }
+        }
+    }
+
+    private func showError(_ text: String) {
+        let alert = NSAlert()
+        alert.messageText = "Could not connect"
+        alert.informativeText = text
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
+    }
 }
