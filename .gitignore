@@ -1,0 +1,12 @@
+.DS_Store
+.build/
+DerivedData/
+*.xcuserstate
+*.swp
+.env
+.env.*
+auth.json
+*token*
+*secret*
+*.log
+UsageBar.app/
