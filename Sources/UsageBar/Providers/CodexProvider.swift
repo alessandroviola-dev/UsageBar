@@ -59,16 +59,24 @@ struct CodexProvider: UsageProvider {
 
         let initialize = #"{"id":1,"method":"initialize","params":{"clientInfo":{"name":"UsageBar","version":"0.1.0"},"capabilities":{}}}"#
         let read = #"{"id":2,"method":"account/rateLimits/read","params":null}"#
+        defer {
+            try? input.fileHandleForWriting.close()
+            if process.isRunning { process.terminate() }
+            process.waitUntilExit()
+        }
         input.fileHandleForWriting.write(Data((initialize + "\n" + read + "\n").utf8))
-        try? input.fileHandleForWriting.close()
-        let data = output.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        guard process.terminationStatus == 0 else { throw ProviderError.commandFailed }
-
-        for line in data.split(separator: 10) {
-            guard let object = try? JSONSerialization.jsonObject(with: Data(line)) as? [String: Any],
-                  (object["id"] as? Int) == 2 else { continue }
-            return Data(line)
+        var received = Data()
+        // app-server remains alive for interactive clients. Read only until the
+        // requested response arrives, then terminate this short-lived child.
+        while process.isRunning {
+            let chunk = output.fileHandleForReading.availableData
+            guard !chunk.isEmpty else { break }
+            received.append(chunk)
+            for line in received.split(separator: 10) {
+                guard let object = try? JSONSerialization.jsonObject(with: Data(line)) as? [String: Any],
+                      (object["id"] as? Int) == 2 else { continue }
+                return Data(line)
+            }
         }
         throw ProviderError.malformedResponse
     }

@@ -16,7 +16,7 @@ Results are recorded only when actually run.
 | No Dock icon | NOT TESTED | `LSUIElement` is set. |
 | Launch at Login | NOT TESTED | Implemented with `SMAppService.mainApp`. |
 | Install | PASS | `./install.sh` created `~/Applications/UsageBar.app`, launched it, and its ad-hoc signature verified. |
-| Reinstall | NOT TESTED | Installer has safe replacement/rollback logic; not run a second time. |
+| Reinstall | PASS | `./install.sh` was run again; it safely replaced the existing bundle and relaunched UsageBar. |
 | Uninstall | NOT TESTED | |
 | CPU/RSS | NOT TESTED | |
 | Child processes | NOT TESTED | Codex app-server is short-lived per refresh, not persistent. |
