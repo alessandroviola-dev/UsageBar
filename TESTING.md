@@ -26,18 +26,18 @@ Results are recorded only when actually run.
 
 ## Codex live record
 
-The safe validation command sent only `initialize` and `account/rateLimits/read` to the existing official local Codex app-server. It returned a 300-minute primary window at 21% used (79% remaining) and a 10080-minute secondary window at 14% used (86% remaining). No account identifier, token, header, or complete payload is recorded.
+The safe validation command sent only `initialize` and `account/rateLimits/read` to the existing official local Codex app-server. Its most recent validation returned a 300-minute primary window at 30% used (70% remaining) and a 10080-minute secondary window at 15% used (85% remaining). No account identifier, token, header, or complete payload is recorded.
 
 ```text
 Codex authoritative (official local app-server):
-5H used: 21%
-5H remaining: 79%
-7D used: 14%
-7D remaining: 86%
+5H used: 30%
+5H remaining: 70%
+7D used: 15%
+7D remaining: 85%
 
 UsageBar normalization:
-5H 79%
-7D 86%
+5H 70%
+7D 85%
 
 Independent-source result: NOT TESTED
 ```
