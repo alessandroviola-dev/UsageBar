@@ -64,12 +64,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         statusItem.menu = menu
     }
 
-    func menuWillOpen(_ menu: NSMenu) {
-        // Rebuild so countdown text is fresh when the user opens the dropdown,
-        // then refresh stale provider summaries in the background.
-        update()
-        monitor.refreshProviderSummariesIfStale()
-    }
+    func menuWillOpen(_ menu: NSMenu) { monitor.refreshProviderSummariesIfStale() }
     @objc private func refresh() { monitor.refresh(manual: true) }
     @objc private func selectProvider(_ sender: NSMenuItem) { if let id = sender.representedObject as? String { monitor.select(providerID: id) } }
     @objc private func showProviders() {
