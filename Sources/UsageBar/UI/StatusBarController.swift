@@ -22,8 +22,14 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         menu.delegate = self
         // Cached truthful summaries, ordered by the provider registry. The active
         // provider is subtly marked; only it appears in the menu-bar title.
+        // Codex also shows a compact reset countdown in the dropdown, e.g.
+        // `Codex 5H 23% 02:34H | 7D 50% 3D 07:12H`.
         for provider in monitor.providers {
-            guard let snapshot = monitor.cachedSnapshot(for: provider.id), let summary = UsageFormatting.snapshotSummary(snapshot) else { continue }
+            guard let snapshot = monitor.cachedSnapshot(for: provider.id),
+                  let summary = UsageFormatting.menuSnapshotSummary(
+                    snapshot,
+                    showResetCountdown: provider.id == "codex"
+                  ) else { continue }
             let item = NSMenuItem(title: "\(provider.statusName)\t\(summary)", action: nil, keyEquivalent: "")
             item.isEnabled = false
             if provider.id == monitor.activeProviderID { item.state = .on }
@@ -58,7 +64,12 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         statusItem.menu = menu
     }
 
-    func menuWillOpen(_ menu: NSMenu) { monitor.refreshProviderSummariesIfStale() }
+    func menuWillOpen(_ menu: NSMenu) {
+        // Rebuild so countdown text is fresh when the user opens the dropdown,
+        // then refresh stale provider summaries in the background.
+        update()
+        monitor.refreshProviderSummariesIfStale()
+    }
     @objc private func refresh() { monitor.refresh(manual: true) }
     @objc private func selectProvider(_ sender: NSMenuItem) { if let id = sender.representedObject as? String { monitor.select(providerID: id) } }
     @objc private func showProviders() {
