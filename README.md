@@ -1,10 +1,12 @@
 # UsageBar
 
-`Codex 5H 76% | 7D 42%`
+Menu bar: `Codex 5H 23% | 7D 50%`
+
+Codex menu: `Codex 5H 23% 02:34H | 7D 50% 3D 07:12H`
 
 A tiny native macOS menu-bar utility for AI usage limits.
 
-UsageBar shows **remaining** quota for one selected provider, with at most two meaningful percentage limits. The menu bar always prefixes the active provider, while the dropdown contains compact cached summaries for connected providers with truthful quota data. It is deliberately not a dashboard: no charts, costs, tokens, history, notifications, or Dock icon.
+UsageBar shows **remaining** quota for one selected provider, with at most two meaningful percentage limits. The menu bar always prefixes the active provider and deliberately has no reset countdown. The Codex row in the dropdown adds compact reset countdowns (`HH:MMH`, or `dD HH:MMH`) to its truthful cached summary; other connected providers retain their normal compact summaries. It is deliberately not a dashboard: no charts, costs, tokens, history, notifications, or Dock icon.
 
 **v0.1.0 status: PASS.** Codex and GitHub Copilot are live-validated on the development Mac; OpenRouter support is implemented but optional and requires a user-supplied API key.
 
@@ -16,7 +18,7 @@ The app does not read Codex sessions, prompts, conversations, or authentication 
 
 OpenRouter can be connected from the Providers window with an API key. Use **Rescan Providers** after installing or signing in to a local tool. Its credits endpoint supplies purchased and consumed credit, so `Credits XX%` has a real denominator. Other providers are only listed where no safe truthful adapter is implemented.
 
-The menu-bar labels derive from the reported window duration, so a 300-minute window becomes `5H` and a 10080-minute window becomes `7D`. Values are `100 - used_percent`, clamped to `0...100`.
+The menu-bar labels derive from the reported window duration, so a 300-minute window becomes `5H` and a 10080-minute window becomes `7D`. Values are `100 - used_percent`, clamped to `0...100`. Codex reset times are shown only in its dropdown row, rounded up to the next minute: `02:34H` or `3D 07:12H`.
 
 See [PROVIDERS.md](PROVIDERS.md) for truthful provider status.
 
