@@ -28,6 +28,13 @@ struct CodexProvider: UsageProvider {
     func fetchUsage() async throws -> UsageSnapshot {
         let response = try await Self.client.rateLimits()
         let decoded = try JSONDecoder().decode(RPCResponse.self, from: response)
+        if let error = decoded.error {
+            let lowered = error.message.lowercased()
+            if lowered.contains("401") || lowered.contains("token_revoked") || lowered.contains("unauthorized") {
+                throw ProviderError.authenticationFailed
+            }
+            throw ProviderError.commandFailed
+        }
         guard let limits = decoded.result?.rateLimits else { throw ProviderError.malformedResponse }
         return UsageSnapshot(providerID: id, accountID: "codex-local", primary: limits.primary.map(Self.window), secondary: limits.secondary.map(Self.window), fetchedAt: .now)
     }
@@ -40,6 +47,7 @@ struct CodexProvider: UsageProvider {
         guard let executable = LocalProviderDiscovery().executable(named: "codex") else {
             throw ProviderError.unavailable("Codex CLI is not installed or is not on a supported path.")
         }
+
         let process = Process()
         process.executableURL = executable
         process.arguments = ["app-server"]
@@ -57,20 +65,42 @@ struct CodexProvider: UsageProvider {
             if process.isRunning { process.terminate() }
             process.waitUntilExit() // Always reap the short-lived child.
         }
+
+        // Codex app-server requires the normal initialize handshake:
+        // initialize request -> wait for id:1 -> initialized notification -> rate-limit request.
         let initialize = #"{"id":1,"method":"initialize","params":{"clientInfo":{"name":"UsageBar","version":"0.1.0"},"capabilities":{}}}"#
+        let initialized = #"{"method":"initialized"}"#
         let read = #"{"id":2,"method":"account/rateLimits/read","params":null}"#
-        input.fileHandleForWriting.write(Data((initialize + "\n" + read + "\n").utf8))
-        var received = Data()
+        input.fileHandleForWriting.write(Data((initialize + "\n").utf8))
+
+        var buffer = Data()
+        var initializationComplete = false
+
         while process.isRunning {
             let chunk = output.fileHandleForReading.availableData
             guard !chunk.isEmpty else { break }
-            received.append(chunk)
-            for line in received.split(separator: 10) {
-                guard let object = try? JSONSerialization.jsonObject(with: Data(line)) as? [String: Any],
-                      (object["id"] as? Int) == 2 else { continue }
-                return Data(line)
+            buffer.append(chunk)
+
+            while let newline = buffer.firstIndex(of: 10) {
+                let line = Data(buffer[..<newline])
+                buffer.removeSubrange(...newline)
+                guard !line.isEmpty,
+                      let object = try? JSONSerialization.jsonObject(with: line) as? [String: Any],
+                      let id = object["id"] as? Int else { continue }
+
+                if id == 1, !initializationComplete {
+                    if object["error"] != nil { return line }
+                    initializationComplete = true
+                    input.fileHandleForWriting.write(Data((initialized + "\n" + read + "\n").utf8))
+                    continue
+                }
+
+                if id == 2 {
+                    return line
+                }
             }
         }
+
         if timeout.didFire { throw ProviderError.commandFailed }
         throw ProviderError.malformedResponse
     }
@@ -109,7 +139,11 @@ private final class ProcessTimeout: @unchecked Sendable {
     func cancel() { timer.setEventHandler {}; timer.cancel() }
 }
 
-private struct RPCResponse: Decodable { let result: RateLimitsResult? }
+private struct RPCResponse: Decodable {
+    let result: RateLimitsResult?
+    let error: RPCError?
+}
+private struct RPCError: Decodable { let code: Int?; let message: String }
 private struct RateLimitsResult: Decodable { let rateLimits: RateLimits }
 private struct RateLimits: Decodable { let primary: LimitWindow?; let secondary: LimitWindow? }
 private struct LimitWindow: Decodable { let usedPercent: Double?; let windowDurationMins: Int?; let resetsAt: TimeInterval? }
