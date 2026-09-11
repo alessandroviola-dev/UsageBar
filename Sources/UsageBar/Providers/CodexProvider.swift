@@ -9,6 +9,15 @@ struct CodexProvider: UsageProvider {
     private static let client = CodexAppServerClient()
 
     func connectionStatus() async -> ProviderConnectionStatus {
+        let discovery = LocalProviderDiscovery()
+        switch discovery.state(for: id) {
+        case .notInstalled:
+            return .unsupported(reason: "Not installed")
+        case .needsLogin:
+            return .disconnected
+        default:
+            break
+        }
         do { _ = try await fetchUsage(); return .connected(accountName: "Codex") }
         catch { return .disconnected }
     }
@@ -28,10 +37,11 @@ struct CodexProvider: UsageProvider {
     }
 
     fileprivate static func readRateLimits() throws -> Data {
-        let executable = ["/opt/homebrew/bin/codex", "/usr/local/bin/codex"].first { FileManager.default.isExecutableFile(atPath: $0) }
-        guard let executable else { throw ProviderError.unavailable("Codex CLI is not installed or is not on a supported path.") }
+        guard let executable = LocalProviderDiscovery().executable(named: "codex") else {
+            throw ProviderError.unavailable("Codex CLI is not installed or is not on a supported path.")
+        }
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: executable)
+        process.executableURL = executable
         process.arguments = ["app-server"]
         let input = Pipe()
         let output = Pipe()
