@@ -33,7 +33,7 @@ See [PROVIDERS.md](PROVIDERS.md) for truthful provider status.
 ## Install
 
 ```bash
-git clone https://github.com/Ilcoach/UsageBar.git
+git clone https://github.com/alessandroviola-dev/UsageBar.git
 cd UsageBar
 ./install.sh
 ```
