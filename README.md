@@ -30,7 +30,22 @@ See [PROVIDERS.md](PROVIDERS.md) for truthful provider status.
 - There is no UsageBar server, telemetry, analytics, tracking, backend, or remote sync.
 - UsageBar makes no billable AI generation request to discover a quota.
 
-## Install
+## Download
+
+Normal users should download the latest compiled `UsageBar-vX.Y.Z-macOS.zip` from [GitHub Releases](https://github.com/alessandroviola-dev/UsageBar/releases). The download is ready to use: Xcode, Swift, Homebrew, and Command Line Tools are **not** required.
+
+## Installation
+
+1. Download `UsageBar-vX.Y.Z-macOS.zip` from GitHub Releases.
+2. Extract it to obtain `UsageBar.app`.
+3. Drag `UsageBar.app` to `/Applications`.
+4. Open UsageBar.
+
+The current builds are ad-hoc signed and are not yet Developer ID notarized. If Gatekeeper blocks the first launch, control-click the app, choose **Open**, then confirm **Open**; alternatively approve it in **System Settings → Privacy & Security**. Do not disable Gatekeeper globally.
+
+## Build from source (developers)
+
+Source builds are for developers. They require macOS 13+, Apple Silicon, Swift 6+, and a macOS SDK:
 
 ```bash
 git clone https://github.com/alessandroviola-dev/UsageBar.git
@@ -38,7 +53,7 @@ cd UsageBar
 ./install.sh
 ```
 
-This creates `~/Applications/UsageBar.app`, validates its plists, ad-hoc signs it, safely replaces a previous UsageBar installation, and launches it.
+`./install.sh` creates `~/Applications/UsageBar.app` locally. To create the release bundle and ZIP used by CI, run `./scripts/build-release.sh`.
 
 ## Uninstall
 
