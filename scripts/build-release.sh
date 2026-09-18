@@ -74,7 +74,7 @@ fi
 if printf '%s\n' "$entries" | grep -E '(^|/)(\.build|DerivedData|\.env|.*\.(pem|p12|cer|key)|.*\.log)(/|$)' >/dev/null; then
     fail "ZIP contains excluded local or credential material."
 fi
-if unzip -p "$zip" | grep -a -F '$HOME' >/dev/null; then
+if unzip -p "$zip" | grep -a -E '/Users/[[:alnum:]_.-]+' >/dev/null; then
     fail "ZIP contains an absolute local user path."
 fi
 
