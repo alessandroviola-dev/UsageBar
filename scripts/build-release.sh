@@ -7,6 +7,11 @@ APP_NAME="UsageBar"
 BUNDLE_ID="com.alessandroviola.usagebar"
 INFO_PLIST="$ROOT/Resources/Info.plist"
 OUTPUT_DIR="${OUTPUT_DIR:-$ROOT/dist}"
+# Leave these unset for the reproducible ad-hoc path used by CI. A future release
+# can set SIGNING_IDENTITY to a Developer ID Application identity and NOTARY_PROFILE
+# to a notarytool keychain profile; neither credential is stored in this repository.
+SIGNING_IDENTITY="${SIGNING_IDENTITY:--}"
+NOTARY_PROFILE="${NOTARY_PROFILE:-}"
 
 fail() { printf '%s\n' "build-release: $*" >&2; exit 1; }
 [[ "$(uname -s)" == "Darwin" ]] || fail "macOS is required."
@@ -20,7 +25,8 @@ build=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$INFO_PLIST")
 [[ -n "$version" && -n "$build" ]] || fail "Bundle version is missing."
 
 cd "$ROOT"
-swift build -c release --arch arm64
+# Do not serialize the builder's absolute source path into the shipped executable.
+swift build -c release --arch arm64 -Xswiftc -debug-prefix-map -Xswiftc "$ROOT=/Source"
 bin_path=$(swift build -c release --arch arm64 --show-bin-path)
 executable="$bin_path/$APP_NAME"
 [[ -x "$executable" ]] || fail "Release executable was not produced: $executable"
@@ -44,7 +50,8 @@ plutil -lint "$app/Contents/Info.plist" "$app/Contents/Resources/PrivacyInfo.xcp
 if otool -L "$app/Contents/MacOS/$APP_NAME" | grep -E '/\.build/|SwiftTerm\.framework' >/dev/null; then
     fail "The executable has a SwiftPM build-directory runtime dependency."
 fi
-codesign --force --deep --sign - --identifier "$BUNDLE_ID" "$app"
+[[ -z "$NOTARY_PROFILE" || "$SIGNING_IDENTITY" != "-" ]] || fail "Notarization requires a Developer ID signing identity."
+codesign --force --deep --sign "$SIGNING_IDENTITY" --identifier "$BUNDLE_ID" "$app"
 codesign --verify --deep --strict --verbose=2 "$app"
 
 # The archive whitelist makes it impossible to ship repository sources or local build data.
@@ -53,7 +60,13 @@ rm -rf "$OUTPUT_DIR/$APP_NAME.app"
 cp -R "$app" "$OUTPUT_DIR/$APP_NAME.app"
 zip="$OUTPUT_DIR/$APP_NAME-v$version-macOS.zip"
 rm -f "$zip"
-ditto -c -k --sequesterRsrc --keepParent "$app" "$zip"
+ditto -c -k --sequesterRsrc --keepParent "$OUTPUT_DIR/$APP_NAME.app" "$zip"
+if [[ -n "$NOTARY_PROFILE" ]]; then
+    xcrun notarytool submit "$zip" --keychain-profile "$NOTARY_PROFILE" --wait
+    xcrun stapler staple "$OUTPUT_DIR/$APP_NAME.app"
+    rm -f "$zip"
+    ditto -c -k --sequesterRsrc --keepParent "$OUTPUT_DIR/$APP_NAME.app" "$zip"
+fi
 entries=$(unzip -Z1 "$zip")
 if printf '%s\n' "$entries" | grep -Ev "^${APP_NAME}\.app(/|$)" >/dev/null; then
     fail "ZIP contains files outside the application bundle."
