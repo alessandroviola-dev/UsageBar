@@ -21,6 +21,7 @@ mkdir -p "$NEW/Contents/MacOS" "$NEW/Contents/Resources"
 cp "$BINARY" "$NEW/Contents/MacOS/UsageBar"
 cp Resources/Info.plist "$NEW/Contents/Info.plist"
 cp Resources/PrivacyInfo.xcprivacy "$NEW/Contents/Resources/PrivacyInfo.xcprivacy"
+cp Resources/AppIcon.icns "$NEW/Contents/Resources/AppIcon.icns"
 plutil -lint "$NEW/Contents/Info.plist" >/dev/null
 plutil -lint "$NEW/Contents/Resources/PrivacyInfo.xcprivacy" >/dev/null
 codesign --force --deep --sign - "$NEW" >/dev/null
