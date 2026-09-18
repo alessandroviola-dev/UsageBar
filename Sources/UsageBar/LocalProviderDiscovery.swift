@@ -24,16 +24,23 @@ struct LocalProviderDiscovery {
     let fileManager: FileManager
     let environment: [String: String]
     let home: URL
+    let fallbackSearchRoots: [String]
 
-    init(fileManager: FileManager = .default, environment: [String: String] = ProcessInfo.processInfo.environment, home: URL = FileManager.default.homeDirectoryForCurrentUser) {
+    init(
+        fileManager: FileManager = .default,
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        home: URL = FileManager.default.homeDirectoryForCurrentUser,
+        fallbackSearchRoots: [String] = ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin"]
+    ) {
         self.fileManager = fileManager
         self.environment = environment
         self.home = home
+        self.fallbackSearchRoots = fallbackSearchRoots
     }
 
     func executable(named name: String) -> URL? {
         let pathEntries = (environment["PATH"] ?? "").split(separator: ":").map(String.init)
-        let roots = pathEntries + ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin"]
+        let roots = pathEntries + fallbackSearchRoots
         var seen = Set<String>()
         for root in roots where seen.insert(root).inserted {
             let candidate = URL(fileURLWithPath: root).appendingPathComponent(name)

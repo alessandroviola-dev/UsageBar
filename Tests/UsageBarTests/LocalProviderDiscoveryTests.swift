@@ -34,7 +34,7 @@ final class LocalProviderDiscoveryTests: XCTestCase {
 
     func testAbsentToolsAreNotInstalled() {
         let root = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString)
-        let discovery = LocalProviderDiscovery(environment: ["PATH": root.path], home: root)
+        let discovery = LocalProviderDiscovery(environment: ["PATH": root.path], home: root, fallbackSearchRoots: [])
         XCTAssertEqual(discovery.state(for: "codex"), .notInstalled)
         XCTAssertEqual(discovery.state(for: "claude-code"), .notInstalled)
         XCTAssertEqual(discovery.state(for: "cursor"), .notInstalled)
