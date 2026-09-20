@@ -1,59 +1,51 @@
 # UsageBar
 
-Menu bar: `Codex 5H 23% | 7D 50%`
+A tiny native macOS menu-bar utility for monitoring OpenAI Codex usage limits, with optional GitHub Copilot support.
 
-Codex menu: `Codex 5H 23% 02:34H | 7D 50% 3D 07:12H`
+UsageBar is designed primarily for OpenAI Codex. It displays the real remaining percentage for the authenticated Codex account's 5-hour and 7-day windows. Reset countdowns appear in the Codex dropdown only; the menu-bar title remains compact and never contains a countdown.
 
-A tiny native macOS menu-bar utility for AI usage limits.
-
-UsageBar shows **remaining** quota for one selected provider, with at most two meaningful percentage limits. The menu bar always prefixes the active provider and deliberately has no reset countdown. The Codex row in the dropdown adds compact reset countdowns (`HH:MMH`, or `dD HH:MMH`) to its truthful cached summary; other connected providers retain their normal compact summaries. It is deliberately not a dashboard: no charts, costs, tokens, history, notifications, or Dock icon.
-
-**v0.1.0 status: PASS.** Codex and GitHub Copilot are live-validated on the development Mac; OpenRouter support is implemented but optional and requires a user-supplied API key.
+GitHub Copilot is an optional secondary provider. Codex is the default provider and the selected provider persists between launches.
 
 ## Providers
 
-v0.1.0 auto-detects local Codex, Claude Code, Gemini CLI, GitHub Copilot, Cursor, and OpenCode installations. Codex uses its official local `app-server` RPC (`account/rateLimits/read`); GitHub Copilot reuses the authenticated `gh` CLI to retrieve quota data. Tools without a safe quota source are clearly shown as not installed, needing login, or quota unavailable rather than guessed.
+The Providers window contains only:
 
-The app does not read Codex sessions, prompts, conversations, or authentication files. It asks the selected authenticated provider for a non-billable quota snapshot every 60 seconds, plus on manual refresh or provider selection.
+- Codex
+- GitHub Copilot
 
-OpenRouter can be connected from the Providers window with an API key. Use **Rescan Providers** after installing or signing in to a local tool. Its credits endpoint supplies purchased and consumed credit, so `Credits XX%` has a real denominator. Other providers are only listed where no safe truthful adapter is implemented.
+It reports only these states: **Connected**, **Not installed**, **Needs login**, and **Temporarily unavailable**. A provider becomes Connected only after UsageBar completes a real quota read. Switching provider changes the menu-bar provider name immediately. Each provider has its own cached snapshot, so one provider's failure does not erase the other's last successful read.
 
-The menu-bar labels derive from the reported window duration, so a 300-minute window becomes `5H` and a 10080-minute window becomes `7D`. Values are `100 - used_percent`, clamped to `0...100`. Codex reset times are shown only in its dropdown row, rounded up to the next minute: `02:34H` or `3D 07:12H`.
+## Authentication and privacy
 
-See [PROVIDERS.md](PROVIDERS.md) for truthful provider status.
+No API key is entered, copied, or stored by UsageBar.
 
-## Security and privacy
+- Codex usage is read exclusively through the official `codex app-server` JSON-RPC interface.
+- GitHub Copilot usage is requested through the user's existing authenticated GitHub CLI; UsageBar does not read or save its token.
+- UsageBar does not read Codex prompts, conversations, sessions, or authentication files.
+- UsageBar does not make a model-generation request to obtain quota data.
+- Authentication remains managed by the official Codex and GitHub tools.
+- There is no UsageBar server, telemetry, analytics, tracking, remote sync, or credential storage.
 
-- OpenRouter API keys entered in the Providers window use the macOS Keychain, never UserDefaults or files.
-- Existing Codex and GitHub CLI credentials are not copied; authentication remains owned by the official provider tools.
-- Credentials never leave the Mac except directly to their configured provider.
-- There is no UsageBar server, telemetry, analytics, tracking, backend, or remote sync.
-- UsageBar makes no billable AI generation request to discover a quota.
-
-## Download
-
-Normal users should download the latest compiled `UsageBar-vX.Y.Z-macOS.zip` from [GitHub Releases](https://github.com/alessandroviola-dev/UsageBar/releases). The download is ready to use: Xcode, Swift, Homebrew, and Command Line Tools are **not** required.
+See [PROVIDERS.md](PROVIDERS.md) for implementation and live-test status.
 
 ## Installation
 
-1. Download `UsageBar-vX.Y.Z-macOS.zip` from GitHub Releases.
-2. Extract it to obtain `UsageBar.app`.
-3. Drag `UsageBar.app` to `/Applications`.
-4. Open UsageBar.
+Download the latest `UsageBar-vX.Y.Z-macOS.zip` from [GitHub Releases](https://github.com/alessandroviola-dev/UsageBar/releases), extract `UsageBar.app`, drag it to `/Applications`, and open it.
 
-The current builds are ad-hoc signed and are not yet Developer ID notarized. If Gatekeeper blocks the first launch, control-click the app, choose **Open**, then confirm **Open**; alternatively approve it in **System Settings → Privacy & Security**. Do not disable Gatekeeper globally.
+Current builds are ad-hoc signed unless a release states otherwise. If Gatekeeper blocks the first launch, control-click the app, choose **Open**, then confirm. Do not disable Gatekeeper globally.
 
-## Build from source (developers)
+## Build from source
 
-Source builds are for developers. They require macOS 13+, Apple Silicon, Swift 6+, and a macOS SDK:
+Requires macOS 13+, Apple Silicon, Swift 6+, and a macOS SDK:
 
 ```bash
-git clone https://github.com/alessandroviola-dev/UsageBar.git
-cd UsageBar
+swift test
+swift build --arch arm64 -Xswiftc -warnings-as-errors
+./scripts/build-release.sh
 ./install.sh
 ```
 
-`./install.sh` creates `~/Applications/UsageBar.app` locally. To create the release bundle and ZIP used by CI, run `./scripts/build-release.sh`.
+`install.sh` installs only `~/Applications/UsageBar.app`. The app has no Dock icon and supports Launch at Login.
 
 ## Uninstall
 
@@ -61,22 +53,11 @@ cd UsageBar
 ./uninstall.sh
 ```
 
-The interactive uninstaller asks about UsageBar-created Keychain entries. Non-interactive use removes those entries by default; `--keep-credentials` preserves them. It never removes provider CLI authentication.
-
-## Development
-
-```bash
-swift test
-swift build -c release --arch arm64
-```
-
-See `TESTING.md` for the executed validation matrix.
+The uninstaller removes only UsageBar and its selected-provider preference. It never alters Codex or GitHub authentication.
 
 ## Limitations
 
-- Provider quota interfaces can change over time; Codex app-server and GitHub Copilot quota behavior may require future adapter updates.
-- OpenRouter is implemented but was not live-tested without a user-supplied API key.
-- Claude Code, Gemini CLI, Cursor, OpenCode, and other listed providers are only shown when UsageBar can report a truthful supported state; unsupported quota data is never fabricated.
+Provider quota interfaces may change. The GitHub Copilot quota path is a compatibility endpoint invoked by the official GitHub CLI because no documented stable public quota endpoint was available for this lightweight native architecture at the time of implementation. Its live status is recorded separately in [TESTING.md](TESTING.md).
 
 ## License
 

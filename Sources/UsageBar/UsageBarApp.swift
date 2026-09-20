@@ -9,13 +9,8 @@ final class UsageBarApp: NSObject, NSApplicationDelegate {
     private var wakeObserver: NSObjectProtocol?
 
     static func main() {
-        // These maintenance modes are used only by uninstall.sh; they do not touch CLI credentials.
         if CommandLine.arguments.contains("--unregister-launch-at-login") {
             if #available(macOS 13.0, *) { try? SMAppService.mainApp.unregister() }
-            return
-        }
-        if CommandLine.arguments.contains("--remove-usagebar-keychain") {
-            try? KeychainStore.deleteAllUsageBarCredentials()
             return
         }
         let app = NSApplication.shared
@@ -30,7 +25,11 @@ final class UsageBarApp: NSObject, NSApplicationDelegate {
         self.monitor = monitor
         statusBar = StatusBarController(monitor: monitor)
         monitor.start()
-        wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak monitor] _ in
+        wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak monitor] _ in
             Task { @MainActor in monitor?.refresh(manual: true) }
         }
     }

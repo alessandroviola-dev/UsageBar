@@ -1,14 +1,13 @@
 import Foundation
 
+/// A provider is read-only: authentication remains with its official tool.
 protocol UsageProvider: Sendable {
     var id: String { get }
     var displayName: String { get }
     var statusName: String { get }
-    var allowedHosts: [String] { get }
 
+    /// This must perform a real quota read before reporting `.connected`.
     func connectionStatus() async -> ProviderConnectionStatus
-    func connect() async throws
-    func disconnect() async throws
     func fetchUsage() async throws -> UsageSnapshot
 }
 
@@ -16,34 +15,31 @@ extension UsageProvider {
     var statusName: String { displayName }
 }
 
-enum ProviderError: LocalizedError, Sendable {
-    case unavailable(String)
+enum ProviderError: LocalizedError, Sendable, Equatable {
+    case notInstalled
+    case needsLogin
+    case temporarilyUnavailable
     case malformedResponse
-    case commandFailed
     case authenticationFailed
-    case rateLimited(retryAfter: Date?)
-    case network
 
     var errorDescription: String? {
         switch self {
-        case .unavailable(let message): return message
-        case .malformedResponse: return "The provider returned an invalid usage response."
-        case .commandFailed: return "The provider usage service could not be started."
-        case .authenticationFailed: return "The provider rejected the credential."
-        case .rateLimited: return "The provider asked UsageBar to retry later."
-        case .network: return "The provider request failed."
+        case .notInstalled:
+            return "The required official tool is not installed."
+        case .needsLogin, .authenticationFailed:
+            return "Sign in with the official provider tool, then try again."
+        case .temporarilyUnavailable:
+            return "The provider is temporarily unavailable."
+        case .malformedResponse:
+            return "The provider returned an invalid usage response."
         }
     }
-}
 
-struct UnavailableProvider: UsageProvider {
-    let id: String
-    let displayName: String
-    let reason: String
-    let allowedHosts: [String] = []
-
-    func connectionStatus() async -> ProviderConnectionStatus { .unsupported(reason: reason) }
-    func connect() async throws { throw ProviderError.unavailable(reason) }
-    func disconnect() async throws {}
-    func fetchUsage() async throws -> UsageSnapshot { throw ProviderError.unavailable(reason) }
+    var connectionStatus: ProviderConnectionStatus {
+        switch self {
+        case .notInstalled: .notInstalled
+        case .needsLogin, .authenticationFailed: .needsLogin
+        case .temporarilyUnavailable, .malformedResponse: .temporarilyUnavailable
+        }
+    }
 }

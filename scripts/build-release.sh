@@ -25,14 +25,20 @@ build=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$INFO_PLIST")
 [[ -n "$version" && -n "$build" ]] || fail "Bundle version is missing."
 
 cd "$ROOT"
-# Do not serialize the builder's absolute source path into the shipped executable.
-swift build -c release --arch arm64 -Xswiftc -debug-prefix-map -Xswiftc "$ROOT=/Source"
+# Treat every compiler warning as a release failure and remap source paths. Keep
+# the Clang module cache outside the remapped source tree: otherwise its paths
+# are remapped too and the linker emits missing-PCM warnings.
+MODULE_CACHE=$(mktemp -d "${TMPDIR:-/tmp}/${APP_NAME}-module-cache.XXXXXX")
+swift build -c release --arch arm64 \
+    -Xswiftc -warnings-as-errors \
+    -Xswiftc -debug-prefix-map -Xswiftc "$ROOT=/Source" \
+    -Xswiftc -module-cache-path -Xswiftc "$MODULE_CACHE"
 bin_path=$(swift build -c release --arch arm64 --show-bin-path)
 executable="$bin_path/$APP_NAME"
 [[ -x "$executable" ]] || fail "Release executable was not produced: $executable"
 
 stage=$(mktemp -d "${TMPDIR:-/tmp}/${APP_NAME}-release.XXXXXX")
-trap 'rm -rf "$stage"' EXIT
+trap 'rm -rf "$stage" "$MODULE_CACHE"' EXIT
 app="$stage/$APP_NAME.app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 cp "$INFO_PLIST" "$app/Contents/Info.plist"
@@ -40,6 +46,9 @@ cp "$ROOT/Resources/PrivacyInfo.xcprivacy" "$app/Contents/Resources/PrivacyInfo.
 cp "$ROOT/Resources/AppIcon.icns" "$app/Contents/Resources/AppIcon.icns"
 cp "$executable" "$app/Contents/MacOS/$APP_NAME"
 chmod 755 "$app/Contents/MacOS/$APP_NAME"
+# Swift's linker command metadata records absolute intermediate-object paths.
+# They are not needed at runtime; remove debug/local-symbol data before signing.
+strip -S "$app/Contents/MacOS/$APP_NAME"
 
 plutil -lint "$app/Contents/Info.plist" "$app/Contents/Resources/PrivacyInfo.xcprivacy" >/dev/null
 [[ $(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Contents/Info.plist") == "$BUNDLE_ID" ]] || fail "Unexpected bundle identifier."

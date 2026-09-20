@@ -24,8 +24,18 @@ struct UsageSnapshot: Equatable, Sendable {
 
 enum ProviderConnectionStatus: Equatable, Sendable {
     case connected(accountName: String)
-    case disconnected
-    case unsupported(reason: String)
+    case notInstalled
+    case needsLogin
+    case temporarilyUnavailable
+
+    var label: String {
+        switch self {
+        case .connected: "Connected"
+        case .notInstalled: "Not installed"
+        case .needsLogin: "Needs login"
+        case .temporarilyUnavailable: "Temporarily unavailable"
+        }
+    }
 }
 
 enum UsageFormatting {
@@ -48,13 +58,11 @@ enum UsageFormatting {
         return values.prefix(2).map { "\($0.label) \($0.remainingPercent)%" }.joined(separator: " | ")
     }
 
-    /// Compact summary for the dropdown. When requested, each quota window also
-    /// shows the time remaining until its reset, without changing the menu-bar title.
+    /// Dropdown-only summary. Menu-bar titles deliberately never include a countdown.
     static func menuSnapshotSummary(_ snapshot: UsageSnapshot?, showResetCountdown: Bool, now: Date = .now) -> String? {
         guard let snapshot else { return nil }
         let values = [snapshot.primary, snapshot.secondary].compactMap { $0 }
         guard !values.isEmpty else { return nil }
-
         return values.prefix(2).map { window in
             var value = "\(window.label) \(window.remainingPercent)%"
             if showResetCountdown, let countdown = resetCountdown(window.resetAt, now: now) {
@@ -69,36 +77,14 @@ enum UsageFormatting {
         return "\(providerName) \(summary)"
     }
 
-    /// Countdown until reset. Examples: `02:34H`, `3D 07:15H`.
-    /// Rounds up to the next minute so the display never reaches zero early.
+    /// Countdown until reset, rounded up to avoid displaying zero early.
     static func resetCountdown(_ date: Date?, now: Date = .now) -> String? {
         guard let date else { return nil }
-        let seconds = max(0, date.timeIntervalSince(now))
-        let totalMinutes = Int(ceil(seconds / 60.0))
+        let totalMinutes = Int(ceil(max(0, date.timeIntervalSince(now)) / 60.0))
         let days = totalMinutes / 1_440
         let hours = (totalMinutes % 1_440) / 60
         let minutes = totalMinutes % 60
-
-        if days > 0 {
-            return String(format: "%dD %02d:%02dH", days, hours, minutes)
-        }
+        if days > 0 { return String(format: "%dD %02d:%02dH", days, hours, minutes) }
         return String(format: "%02d:%02dH", hours, minutes)
-    }
-
-    static func resetText(_ date: Date?, now: Date = .now) -> String? {
-        guard let date else { return nil }
-        let calendar = Calendar.current
-        if calendar.isDate(date, inSameDayAs: now) {
-            let formatter = DateFormatter()
-            formatter.locale = .current
-            formatter.timeZone = .current
-            formatter.dateFormat = "HH:mm"
-            return "reset \(formatter.string(from: date))"
-        }
-        let formatter = DateFormatter()
-        formatter.locale = .current
-        formatter.timeZone = .current
-        formatter.dateFormat = "d MMM"
-        return "reset \(formatter.string(from: date))"
     }
 }
