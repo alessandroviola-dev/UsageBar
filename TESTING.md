@@ -1,4 +1,4 @@
-# Testing — UsageBar 0.1.0
+# Testing — UsageBar 0.2.0
 
 Results below describe this cleanup run. Fixture tests and live-account tests are recorded separately.
 
