@@ -94,11 +94,32 @@ final class ProvidersWindowController: NSWindowController {
         let id = sender.tag == 1 ? "openrouter" : ""
         guard let provider = monitor.provider(id: id) as? any APIKeyProvider else { return }
         let name = NSTextField(string: "Personal")
+        name.placeholderString = "Personal"
         let key = NSSecureTextField(string: "")
-        let accessory = NSStackView(views: [label("Account Name", bold: false), name, label("API Key", bold: false), key])
+        key.placeholderString = "Paste \(provider.displayName) API key"
+
+        // NSAlert sizes an accessory view from its intrinsic content size. Without
+        // explicit field widths this vertical stack can collapse horizontally,
+        // causing the labels and text fields to overlap and making the secure
+        // field effectively unusable.
+        let accessory = NSStackView(views: [
+            label("Account Name", bold: false),
+            name,
+            label("API Key", bold: false),
+            key
+        ])
         accessory.orientation = .vertical
         accessory.alignment = .leading
+        accessory.distribution = .fill
         accessory.spacing = 6
+
+        let fieldWidth: CGFloat = 320
+        name.widthAnchor.constraint(equalToConstant: fieldWidth).isActive = true
+        key.widthAnchor.constraint(equalToConstant: fieldWidth).isActive = true
+        name.setContentCompressionResistancePriority(.required, for: .horizontal)
+        key.setContentCompressionResistancePriority(.required, for: .horizontal)
+        accessory.frame = NSRect(x: 0, y: 0, width: fieldWidth, height: 112)
+
         let alert = NSAlert()
         alert.messageText = "Add \(provider.displayName) Key"
         alert.informativeText = "The key is validated using a non-billable endpoint and stored only in your Keychain."
