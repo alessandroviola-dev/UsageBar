@@ -113,7 +113,7 @@ enum CodexAppServerSession {
             process.waitUntilExit()
         }
 
-        let initialize = #"{"id":1,"method":"initialize","params":{"clientInfo":{"name":"UsageBar","version":"0.3.0"},"capabilities":{}}}"#
+        let initialize = #"{"id":1,"method":"initialize","params":{"clientInfo":{"name":"UsageBar","version":"0.3.1"},"capabilities":{}}}"#
         let initialized = #"{"method":"initialized"}"#
         let read = #"{"id":2,"method":"account/rateLimits/read","params":null}"#
         input.fileHandleForWriting.write(Data((initialize + "\n").utf8))
