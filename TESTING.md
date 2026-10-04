@@ -1,10 +1,10 @@
-# Testing — UsageBar 0.2.0
+# Testing — UsageBar 0.3.0
 
 Results below describe this cleanup run. Fixture tests and live-account tests are recorded separately.
 
 | Check | Result | Evidence |
 |---|---|---|
-| XCTest fixture suite | PASS | `swift test`: 18 tests executed, 16 passed, 0 failed, 2 explicitly skipped live tests when their opt-in environment variable was absent. |
+| XCTest fixture suite | PASS | `swift test`: 20 tests executed, 18 passed, 0 failed, 2 explicitly skipped live tests when their opt-in environment variable was absent. |
 | Registry and default provider | PASS | Fixture coverage verifies exactly `codex` and `github-copilot`, with Codex selected by default. |
 | Codex CLI/login/error states | PASS | Fixtures cover absent CLI, absent login, revoked token, backend error, malformed response, and app-server timeout. |
 | Codex RPC handshake | PASS | Fixture process asserts `initialize` response before `initialized`, followed by `account/rateLimits/read`. |
@@ -12,6 +12,7 @@ Results below describe this cleanup run. Fixture tests and live-account tests ar
 | Copilot CLI/auth/parser states | PASS | Fixtures cover absent GitHub CLI, unauthenticated GitHub CLI, valid quota, and malformed JSON. |
 | Provider cache/switching/persistence | PASS | Fixture coverage verifies isolated snapshots, switching, and persisted selected provider. |
 | Countdown/menu-bar formatting | PASS | Fixtures verify the Codex dropdown countdown and no countdown in the menu-bar title. |
+| Jev observed cost | PASS | Fixture coverage verifies ForgeApis telemetry/canary parsing, deduplication, zero/unavailable/partial states, pricing, and sub-cent formatting. |
 | Live Codex quota read | PASS | `USAGEBAR_LIVE_PROVIDER_TESTS=1 swift test --filter ProviderTests/testLiveCodexQuotaWhenExplicitlyEnabled` passed against the configured local Codex account. |
 | Live Copilot quota read | PASS | `USAGEBAR_LIVE_PROVIDER_TESTS=1 swift test --filter ProviderTests/testLiveCopilotQuotaWhenExplicitlyEnabled` passed through the configured authenticated GitHub CLI account. |
 | Debug arm64 warnings-as-errors build | PASS | `swift build --arch arm64 -Xswiftc -warnings-as-errors` completed successfully. |

@@ -1,10 +1,14 @@
 # UsageBar
 
-A tiny native macOS menu-bar utility for monitoring OpenAI Codex usage limits, with optional GitHub Copilot support.
+A tiny native macOS menu-bar utility for monitoring OpenAI Codex usage limits, with optional GitHub Copilot support and a read-only Jev observed cost metric.
 
 UsageBar is designed primarily for OpenAI Codex. It displays the real remaining percentage for the authenticated Codex account's 5-hour and 7-day windows. Reset countdowns appear in the Codex dropdown only; the menu-bar title remains compact and never contains a countdown.
 
 GitHub Copilot is an optional secondary provider. Codex is the default provider and the selected provider persists between launches.
+
+## Jev observed cost
+
+UsageBar reads local ForgeApis telemetry and canary data in read-only mode to show **Jev observed cost**. It distinguishes zero usage, unavailable data, and partial observations. It never accesses the Jev API key, makes additional network calls, or invokes Jev. This is observed/list-price cost, not account spend.
 
 ## Providers
 
