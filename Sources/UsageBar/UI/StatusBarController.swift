@@ -35,6 +35,15 @@ final class StatusBarController: NSObject, NSMenuDelegate {
             if provider.id == monitor.activeProviderID { item.state = .on }
             menu.addItem(item)
         }
+        let jevValue: String
+        switch monitor.jevCost.status {
+        case .available: jevValue = JevCostFormatting.usd(monitor.jevCost.costUSD)
+        case .partial: jevValue = "\(JevCostFormatting.usd(monitor.jevCost.costUSD)) (partial)"
+        case .unavailable: jevValue = "unavailable"
+        }
+        let jevItem = NSMenuItem(title: "Jev observed cost\t\(jevValue)", action: nil, keyEquivalent: "")
+        jevItem.isEnabled = false
+        menu.addItem(jevItem)
         if menu.items.isEmpty {
             let item = NSMenuItem(title: "\(monitor.activeProvider.statusName)\t?", action: nil, keyEquivalent: "")
             item.isEnabled = false

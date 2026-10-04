@@ -4,6 +4,7 @@ import Foundation
 final class UsageMonitor {
     private let registry: ProviderRegistry
     private let defaults: UserDefaults
+    private let jevCostReader: JevObservedCostReader
     private var refreshTask: Task<Void, Never>?
     private var generation = 0
     private var refreshInFlight = false
@@ -16,12 +17,15 @@ final class UsageMonitor {
     private(set) var snapshotsByProviderID: [String: UsageSnapshot] = [:]
     private(set) var connectionStatuses: [String: ProviderConnectionStatus] = [:]
     private(set) var lastError = false
+    private(set) var jevCost: JevCostSnapshot
     private(set) var activeProviderID: String
     var onChange: (() -> Void)?
 
-    init(registry: ProviderRegistry = ProviderRegistry(), defaults: UserDefaults = .standard) {
+    init(registry: ProviderRegistry = ProviderRegistry(), defaults: UserDefaults = .standard, jevCostReader: JevObservedCostReader = JevObservedCostReader()) {
         self.registry = registry
         self.defaults = defaults
+        self.jevCostReader = jevCostReader
+        self.jevCost = jevCostReader.read()
         let stored = defaults.string(forKey: "selectedProviderID")
         if let stored, registry.provider(id: stored) != nil {
             activeProviderID = stored
@@ -59,6 +63,9 @@ final class UsageMonitor {
     }
 
     func refresh(manual: Bool = false) {
+        // Jev is a read-only local observation; refreshing quotas never creates events.
+        jevCost = jevCostReader.read()
+        onChange?()
         if refreshInFlight {
             refreshQueued = true
             queuedManualRefresh = queuedManualRefresh || manual
