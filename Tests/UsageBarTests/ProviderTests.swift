@@ -144,7 +144,11 @@ final class ProviderTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suite) }
         let codex = FixtureProvider(id: "codex", results: [.success(FixtureProvider.snapshot(id: "codex", remaining: 76)), .failure(ProviderError.temporarilyUnavailable)])
         let copilot = FixtureProvider(id: "github-copilot", results: [.success(FixtureProvider.snapshot(id: "github-copilot", remaining: 99))])
-        let monitor = UsageMonitor(registry: ProviderRegistry(providers: [codex, copilot]), defaults: defaults)
+        let monitor = UsageMonitor(
+            registry: ProviderRegistry(providers: [codex, copilot]), defaults: defaults,
+            jevCostReader: JevObservedCostReader(homeDirectory: URL(fileURLWithPath: "/nonexistent/fixture-home")),
+            openAICostReader: OpenAICostReader(telemetryURL: URL(fileURLWithPath: "/nonexistent/fixture.jsonl"), keyProvider: { nil })
+        )
         monitor.refresh(manual: true)
         try await Task.sleep(for: .milliseconds(100))
         monitor.select(providerID: "github-copilot")

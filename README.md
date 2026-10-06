@@ -8,7 +8,14 @@ GitHub Copilot is an optional secondary provider. Codex is the default provider 
 
 ## Jev observed cost
 
-UsageBar reads local Jev trace files (`~/.pi/agent/forgejev-traces/*.jsonl`) and legacy ForgeApis telemetry/canary data in read-only mode to show **Jev observed cost**. It uses a recorded cost only for trace records explicitly marked with provider `jev`; generic Pi/OpenAI telemetry is deliberately excluded because its list price is not Jev spend. Otherwise it falls back to the versioned Jev input-token observation. An optional local Jev-dashboard anchor (`~/.pi/agent/forgejev/usage-baseline.json`) starts the displayed total from a confirmed dashboard value and adds new, deduplicated ledger records after its timestamp. It never accesses the Jev API key, makes additional network calls, or invokes Jev, so this is not yet an API-authoritative account-spend value.
+UsageBar reads local Jev trace files (`~/.pi/agent/forgejev-traces/*.jsonl`) and legacy ForgeApis telemetry/canary data in read-only mode to show **Jev observed cost**. It uses a recorded cost only for trace records explicitly marked with provider `jev`; generic Pi/OpenAI telemetry is deliberately excluded because its list price is not Jev spend. Otherwise it falls back to the versioned Jev input-token observation. An optional local Jev-dashboard anchor (`~/.pi/agent/forgejev/usage-baseline.json`) starts the displayed total from a confirmed dashboard value and adds input tokens only from new requests after its timestamp, deduplicated by canonical `requestId` across both ledgers and the shared usage trace. The existing anchor is never rewritten: its cost remains authoritative, with future input charged at $42 per billion input tokens, not a rate inferred from the anchor. Output tokens are free and do not enter the displayed input-token total. It never accesses the Jev API key, makes additional network calls, or invokes Jev, so this is not yet an API-authoritative account-spend value.
+
+## OpenAI cost metrics (not quota providers)
+
+- **OpenAI billed cost (30d)** uses only the OpenAI Organization Costs API, summing `data[].results[].amount.value` in USD across all pages for an explicit rolling 30-day window. A valid zero remains zero. Missing Admin key, failed API access, or an uninterpretable response shows **unavailable**, never a local fallback.
+- **OpenAI observed local** sums valid `assistant_message.usage.costTotal` entries from `~/.pi/agent/forgeapis/telemetry.jsonl`, opened read-only. Malformed records are ignored. This is the observed total of the available file, not a 30-day total or official organization billing.
+
+Official billing polls about every 300 seconds; local costs refresh about every 60 seconds. **Refresh** immediately refreshes both OpenAI metrics, Jev, and provider data without restarting the app. In-flight cost reads are serialized per source and manual refreshes are coalesced.
 
 ## Providers
 
@@ -21,14 +28,16 @@ It reports only these states: **Connected**, **Not installed**, **Needs login**,
 
 ## Authentication and privacy
 
-No API key is entered, copied, or stored by UsageBar.
+Quota authentication remains owned by the official tools. Optional OpenAI billing authentication is separate.
 
 - Codex usage is read exclusively through the official `codex app-server` JSON-RPC interface.
 - GitHub Copilot usage is requested through the user's existing authenticated GitHub CLI; UsageBar does not read or save its token.
 - UsageBar does not read Codex prompts, conversations, sessions, or authentication files.
 - UsageBar does not make a model-generation request to obtain quota data.
-- Authentication remains managed by the official Codex and GitHub tools.
-- There is no UsageBar server, telemetry, analytics, tracking, remote sync, or credential storage.
+- Codex authentication remains managed by official Codex; Copilot authentication remains managed by GitHub CLI.
+- The optional OpenAI Admin API key for billed costs is retained in the macOS Keychain, service `UsageBar.OpenAI.AdminAPIKey`, account `NSUserName()`. UsageBar reads it only for the official Costs request and never displays or logs it, or saves it in preferences, files, source, or persistent environment variables. There is no API-key entry UI.
+- Local observed telemetry and Jev data are read-only filesystem inputs, never modified by UsageBar.
+- There is no UsageBar server, outbound telemetry, analytics, tracking, or remote sync.
 
 See [PROVIDERS.md](PROVIDERS.md) for implementation and live-test status.
 

@@ -5,6 +5,11 @@ final class UsageMonitor {
     private let registry: ProviderRegistry
     private let defaults: UserDefaults
     private let jevCostReader: JevObservedCostReader
+    private let openAICostMonitor: OpenAICostMonitor
+    private var jevTask: Task<Void, Never>?
+    private var jevQueued = false
+    private var activeTask: Task<Void, Never>?
+    private var summaryTasks: [String: Task<Void, Never>] = [:]
     private var refreshTask: Task<Void, Never>?
     private var generation = 0
     private var refreshInFlight = false
@@ -21,11 +26,14 @@ final class UsageMonitor {
     private(set) var activeProviderID: String
     var onChange: (() -> Void)?
 
-    init(registry: ProviderRegistry = ProviderRegistry(), defaults: UserDefaults = .standard, jevCostReader: JevObservedCostReader = JevObservedCostReader()) {
+    var openAICost: OpenAICostMetrics { openAICostMonitor.metrics }
+
+    init(registry: ProviderRegistry = ProviderRegistry(), defaults: UserDefaults = .standard, jevCostReader: JevObservedCostReader = JevObservedCostReader(), openAICostReader: OpenAICostReader = OpenAICostReader()) {
         self.registry = registry
         self.defaults = defaults
         self.jevCostReader = jevCostReader
-        self.jevCost = jevCostReader.read()
+        self.jevCost = JevCostSnapshot(inputTokens: 0, costUSD: 0, status: .unavailable)
+        self.openAICostMonitor = OpenAICostMonitor(reader: openAICostReader)
         let stored = defaults.string(forKey: "selectedProviderID")
         if let stored, registry.provider(id: stored) != nil {
             activeProviderID = stored
@@ -38,9 +46,15 @@ final class UsageMonitor {
         for provider in registry.providers {
             connectionStatuses[provider.id] = discovery.state(for: provider.id).connectionStatus
         }
+        openAICostMonitor.onChange = { [weak self] in self?.onChange?() }
     }
 
-    deinit { refreshTask?.cancel() }
+    deinit {
+        refreshTask?.cancel()
+        jevTask?.cancel()
+        activeTask?.cancel()
+        for task in summaryTasks.values { task.cancel() }
+    }
 
     var activeProvider: any UsageProvider { registry.provider(id: activeProviderID) ?? registry.providers[0] }
     var providers: [any UsageProvider] { registry.providers }
@@ -51,6 +65,7 @@ final class UsageMonitor {
     }
 
     func start() {
+        guard refreshTask == nil else { return }
         refresh()
         refreshConnectionStatuses()
         refreshTask = Task { [weak self] in
@@ -63,9 +78,10 @@ final class UsageMonitor {
     }
 
     func refresh(manual: Bool = false) {
-        // Jev is a read-only local observation; refreshing quotas never creates events.
-        jevCost = jevCostReader.read()
-        onChange?()
+        // Cost sources refresh independently of quota backoff; all file I/O is off MainActor.
+        refreshJev()
+        openAICostMonitor.refresh(manual: manual)
+        if manual { refreshProviderSummariesIfStale(force: true) }
         if refreshInFlight {
             refreshQueued = true
             queuedManualRefresh = queuedManualRefresh || manual
@@ -76,16 +92,34 @@ final class UsageMonitor {
         generation += 1
         let requestGeneration = generation
         let provider = activeProvider
-        Task { [weak self] in
+        activeTask = Task { [weak self] in
             let result: Result<UsageSnapshot, Error>
             do { result = .success(try await provider.fetchUsage()) }
             catch { result = .failure(error) }
+            guard !Task.isCancelled else { return }
             self?.finishActive(result, provider: provider, generation: requestGeneration)
+        }
+    }
+
+    private func refreshJev() {
+        guard jevTask == nil else { jevQueued = true; return }
+        let reader = jevCostReader
+        jevTask = Task { [weak self] in
+            let value = await Task.detached(priority: .utility) { reader.read() }.value
+            guard !Task.isCancelled, let self else { return }
+            self.jevCost = value
+            self.jevTask = nil
+            self.onChange?()
+            if self.jevQueued {
+                self.jevQueued = false
+                self.refreshJev()
+            }
         }
     }
 
     private func finishActive(_ result: Result<UsageSnapshot, Error>, provider: any UsageProvider, generation requestGeneration: Int) {
         refreshInFlight = false
+        activeTask = nil
         switch result {
         case .success(let fetched):
             snapshotsByProviderID[provider.id] = fetched
@@ -116,13 +150,15 @@ final class UsageMonitor {
 
     /// Providers are fetched independently, so a failed read never clears the
     /// other provider's cached quota.
-    func refreshProviderSummariesIfStale() {
+    func refreshProviderSummariesIfStale(force: Bool = false) {
         for provider in providers where provider.id != activeProviderID {
             let expiry = snapshotsByProviderID[provider.id]?.fetchedAt.addingTimeInterval(300) ?? .distantPast
-            guard expiry < .now else { continue }
-            Task { [weak self] in
+            guard (force || expiry < .now), summaryTasks[provider.id] == nil else { continue }
+            summaryTasks[provider.id] = Task { [weak self] in
+                defer { self?.summaryTasks[provider.id] = nil }
                 do {
                     let fetched = try await provider.fetchUsage()
+                    guard !Task.isCancelled else { return }
                     self?.snapshotsByProviderID[provider.id] = fetched
                     self?.connectionStatuses[provider.id] = .connected(accountName: provider.displayName)
                     self?.onChange?()

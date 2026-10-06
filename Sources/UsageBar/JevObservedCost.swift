@@ -32,13 +32,15 @@ enum JevCostFormatting {
         let ns = value as NSDecimalNumber
         let double = ns.doubleValue
         // Keep four decimal places so sub-cent API costs remain visible.
-        if double >= 0.01 { return String(format: "$%.4f", double) }
-        // Six decimals preserve the expected sub-cent observations.
-        return String(format: "$%.6f", double).replacingOccurrences(of: "0+$", with: "", options: .regularExpression)
+        if abs(double) >= 0.01 { return String(format: "$%.4f", double) }
+        // Preserve even a single Jev input token ($0.000000042), not "$0.".
+        let places = max(6, Int(ceil(-log10(abs(double)))) + 2)
+        guard places <= 16 else { return "$\(ns.stringValue)" }
+        return String(format: "$%.*f", places, double).replacingOccurrences(of: "0+$", with: "", options: .regularExpression)
     }
 }
 
-struct JevObservedCostReader {
+struct JevObservedCostReader: Sendable {
     let telemetryURL: URL
     let traceDirectoryURL: URL
     let v1URL: URL
@@ -157,7 +159,6 @@ struct JevObservedCostReader {
         var cost = baseline.costUSD
         var malformed = false
         var identities = Set<String>()
-        let rate = baseline.costUSD / Decimal(max(baseline.tokens, 1))
         for url in [forgeJevLedgerURL, forgeApisLedgerURL] {
             guard let data = try? Data(contentsOf: url) else { continue }
             guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -168,12 +169,10 @@ struct JevObservedCostReader {
                       let date = parseDate(timestamp),
                       date > baseline.date,
                       let input = integer(record["jevInputTokens"]) else { continue }
-                let output = integer(record["jevOutputTokens"]) ?? 0
                 if identities.insert(request).inserted {
-                    let total = input + output
-                    tokens += total
+                    tokens += input
                     requests += 1
-                    cost += Decimal(total) * rate
+                    cost += JevPricing.cost(inputTokens: input)
                 }
             }
         }
@@ -188,12 +187,10 @@ struct JevObservedCostReader {
                       let date = parseDate(timestamp), date > baseline.date,
                       let usage = object["usage"] as? [String: Any],
                       let input = integer(usage["inputTokens"]),
-                      identities.insert("shared:\(request)").inserted else { continue }
-                let output = integer(usage["outputTokens"]) ?? 0
-                let total = input + output
-                tokens += total
+                      identities.insert(request).inserted else { continue }
+                tokens += input
                 requests += 1
-                cost += Decimal(total) * rate
+                cost += JevPricing.cost(inputTokens: input)
             }
         }
         return JevCostSnapshot(inputTokens: tokens, costUSD: cost, status: malformed ? .partial : .available, requestCount: requests)

@@ -36,6 +36,7 @@ final class JevObservedCostTests: XCTestCase {
         XCTAssertEqual(zero.status, .available)
         XCTAssertEqual(zero.costUSD, 0)
         XCTAssertEqual(JevCostFormatting.usd(42), "$42.0000")
+        XCTAssertEqual(JevCostFormatting.usd(JevPricing.cost(inputTokens: 1)), "$0.000000042")
     }
 
     func testDashboardBaselineStartsAtConfirmedTotalAndAddsNewLedgerTokens() throws {
@@ -58,10 +59,30 @@ final class JevObservedCostTests: XCTestCase {
             baselineURL: baseline
         ).read()
 
-        XCTAssertEqual(snapshot.inputTokens, 124_035)
+        XCTAssertEqual(snapshot.inputTokens, 124_015)
         XCTAssertEqual(snapshot.requestCount, 164)
         XCTAssertEqual(snapshot.status, .available)
-        XCTAssertGreaterThan(snapshot.costUSD, Decimal(string: "0.0046")!)
+        XCTAssertEqual(snapshot.costUSD, Decimal(string: "0.0046")! + JevPricing.cost(inputTokens: 100))
+        XCTAssertEqual(try String(contentsOf: baseline, encoding: .utf8), anchor)
+    }
+
+    func testPostBaselineDeduplicatesAcrossBothLedgersAndSharedTrace() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let reader = JevObservedCostReader(homeDirectory: root)
+        defer { try? FileManager.default.removeItem(at: root) }
+        for url in [reader.baselineURL, reader.forgeJevLedgerURL, reader.forgeApisLedgerURL, reader.traceDirectoryURL.appendingPathComponent("jev-usage.jsonl")] {
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        }
+        try #"{"schema":"usagebar-jev-baseline-v1","anchoredAt":"2026-01-01T00:00:00Z","tokens":123915,"requests":163,"costUSD":"0.0046"}"#.write(to: reader.baselineURL, atomically: true, encoding: .utf8)
+        let ledger = #"{"records":[{"requestId":"same","timestamp":"2026-01-01T00:00:01Z","jevInputTokens":100,"jevOutputTokens":20},{"requestId":"old","timestamp":"2025-12-31T00:00:00Z","jevInputTokens":999}]}"#
+        try ledger.write(to: reader.forgeJevLedgerURL, atomically: true, encoding: .utf8)
+        try ledger.write(to: reader.forgeApisLedgerURL, atomically: true, encoding: .utf8)
+        let trace = #"{"event":"jev_usage","source":"forgeapis","requestId":"same","timestamp":"2026-01-01T00:00:01Z","usage":{"inputTokens":100,"outputTokens":20}}"#
+        try (trace + "\n" + trace).write(to: reader.traceDirectoryURL.appendingPathComponent("jev-usage.jsonl"), atomically: true, encoding: .utf8)
+        let snapshot = reader.read()
+        XCTAssertEqual(snapshot.inputTokens, 124_015)
+        XCTAssertEqual(snapshot.requestCount, 164)
+        XCTAssertEqual(snapshot.costUSD, Decimal(string: "0.0046")! + JevPricing.cost(inputTokens: 100))
     }
 
     func testJevMarkedTraceUsesRecordedCost() throws {

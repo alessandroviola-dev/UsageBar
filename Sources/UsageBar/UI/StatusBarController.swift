@@ -6,8 +6,6 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     private let monitor: UsageMonitor
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private var providersWindow: ProvidersWindowController?
-    private var openAICost: OpenAICostSnapshot = .init(usd: 0, available: false)
-    private var openAICostTask: Task<Void, Never>?
 
     init(monitor: UsageMonitor) {
         self.monitor = monitor
@@ -16,18 +14,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         button.font = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
         monitor.onChange = { [weak self] in self?.update() }
         update()
-        openAICostTask = Task { [weak self] in
-            while !Task.isCancelled {
-                let value = await OpenAICostReader().read()
-                guard !Task.isCancelled else { return }
-                self?.openAICost = value
-                self?.update()
-                try? await Task.sleep(for: .seconds(300))
-            }
-        }
     }
-
-    deinit { openAICostTask?.cancel() }
 
     func update() {
         statusItem.button?.title = UsageFormatting.statusTitle(providerName: monitor.activeProvider.statusName, snapshot: monitor.snapshot)
@@ -55,15 +42,11 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         case .unavailable: jevValue = "unavailable"
         }
         let jevTotals = monitor.jevCost.requestCount > 0
-            ? "  ·  \(monitor.jevCost.inputTokens.formatted()) tokens  ·  \(monitor.jevCost.requestCount) req"
+            ? " · \(monitor.jevCost.inputTokens.formatted()) input tokens · \(monitor.jevCost.requestCount) req"
             : ""
-        let jevItem = NSMenuItem(title: "Jev observed cost    \(jevValue)\(jevTotals)", action: nil, keyEquivalent: "")
-        jevItem.isEnabled = false
-        menu.addItem(jevItem)
-        let openAIValue = openAICost.available ? JevCostFormatting.usd(openAICost.usd) : "unavailable"
-        let openAIItem = NSMenuItem(title: "OpenAI API cost (30d)    \(openAIValue)", action: nil, keyEquivalent: "")
-        openAIItem.isEnabled = false
-        menu.addItem(openAIItem)
+        addCostRow(to: menu, label: "Jev observed cost", value: "\(jevValue)\(jevTotals)")
+        addCostRow(to: menu, label: "OpenAI billed cost (30d)", value: monitor.openAICost.billedUSD.map(JevCostFormatting.usd) ?? "unavailable")
+        addCostRow(to: menu, label: "OpenAI observed local", value: monitor.openAICost.observedLocalUSD.map(JevCostFormatting.usd) ?? "unavailable")
         if menu.items.isEmpty {
             let item = NSMenuItem(title: "\(monitor.activeProvider.statusName)\t?", action: nil, keyEquivalent: "")
             item.isEnabled = false
@@ -91,6 +74,13 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         let quit = NSMenuItem(title: "Quit UsageBar", action: #selector(quit), keyEquivalent: "q")
         quit.target = self; menu.addItem(quit)
         statusItem.menu = menu
+    }
+
+    // One typographic separator, not tabs or alignment by repeated spaces.
+    private func addCostRow(to menu: NSMenu, label: String, value: String) {
+        let item = NSMenuItem(title: "\(label): \(value)", action: nil, keyEquivalent: "")
+        item.isEnabled = false
+        menu.addItem(item)
     }
 
     func menuWillOpen(_ menu: NSMenu) { monitor.refreshProviderSummariesIfStale() }

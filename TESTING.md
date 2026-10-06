@@ -1,6 +1,31 @@
-# Testing — UsageBar 0.3.1
+# Testing — UsageBar 0.3.2
 
-Results below describe this cleanup run. Fixture tests and live-account tests are recorded separately.
+## Maintenance validation (build 5)
+
+New offline fixtures in `OpenAICostTests.swift` cover official nested results, multiple buckets/results, pagination and exact 30-day query bounds, authoritative zero, positive API/local separation, API/transport failures, absent key, malformed telemetry/JSON, unsupported currency, empty results, invalid/repeated cursors, per-source coalescing, and manual refresh through UsageMonitor. Fixtures inject transport, endpoint, key provider, file URL and clock; they make no real HTTP calls and contain no real credentials.
+
+Jev fixtures now assert the exact anchored result: 123915 + 100 input tokens = 124015, 163 + 1 requests = 164, and cost 0.0046 + `JevPricing.cost(inputTokens: 100)`. The 20 output tokens do not count. Cross-source requestId deduplication and an unchanged baseline file are verified; legacy coverage is retained.
+
+| Current maintenance check | Result | Evidence |
+|---|---|---|
+| Diff whitespace | PASS | `git diff --check` |
+| Offline XCTest suite | PASS | 37 tests executed, 35 passed, 2 opt-in live quota tests skipped, 0 failures; includes 14 OpenAI and 5 Jev fixtures. |
+| Debug arm64 warnings-as-errors | PASS | `swift build --arch arm64 -Xswiftc -warnings-as-errors` |
+| Release arm64 warnings-as-errors | PASS | `swift build -c release --arch arm64 -Xswiftc -warnings-as-errors` |
+| Local release archive | PASS | `./scripts/build-release.sh`: 0.3.2/build 5 app and ZIP, strict signing and extracted bundle validation; whitelist/local-user-path checks passed. |
+| Installation | PASS | `./install.sh` replaced only `~/Applications/UsageBar.app`; installed defaults report 0.3.2 and 5; strict codesign passes and process is active. |
+| Read-only independent cost checks | PASS | Existing telemetry, Jev baseline and both ledgers read successfully; only aggregate cost/token/request metrics inspected, no model requests generated. |
+| Installed Jev row/auto-refresh | BLOCKED | Actual menu cannot be inspected without macOS Accessibility permission; independent filesystem calculation is not treated as a UI pass. |
+| Installed OpenAI local row comparison | BLOCKED | Independent file sum succeeded, but cannot compare it to the installed UI. |
+| Installed official billed row | BLOCKED | Keychain item presence checked without revealing its data; app performs its normal read, but status/value cannot be inspected in the UI. |
+| Installed manual Refresh | BLOCKED | System Events rejects menu access with error -25211 (assistive access denied); no click or visual confirmation possible. Fixture refresh coverage passes but is not substituted for installed smoke. |
+| Local commit | NOT CREATED | Required installed UI/Refresh gate remains blocked. Changes intentionally left uncommitted for continuation once Accessibility is enabled. |
+
+No hosted CI, push, tag, or release was used. No ForgeJev/ForgeApis data was modified. To finish: enable Accessibility for the controlling terminal/harness, inspect the installed cost rows, compare local totals, click Refresh and verify both OpenAI metrics and Jev/provider updates, then repeat the final audit before one local commit.
+
+## Previous quota validation (0.3.1)
+
+The historical results below concern the previous cleanup run, not the new installed cost smoke. Fixture tests and live-account tests are recorded separately.
 
 | Check | Result | Evidence |
 |---|---|---|
