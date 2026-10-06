@@ -26,7 +26,9 @@ enum JevPricing {
 
 enum JevCostFormatting {
     static func usd(_ value: Decimal) -> String {
-        if value == 0 { return "$0" }
+        // Keep four decimal places even when the amount is zero, so very small
+        // API costs are not presented with the ambiguous "$0" label.
+        if value == 0 { return "$0.0000" }
         let ns = value as NSDecimalNumber
         let double = ns.doubleValue
         if double >= 1 { return String(format: "$%.2f", double) }
