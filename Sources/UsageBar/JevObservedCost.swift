@@ -141,7 +141,7 @@ struct JevObservedCostReader {
               let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               root["schema"] as? String == "usagebar-jev-baseline-v1",
               let timestamp = root["anchoredAt"] as? String,
-              let date = ISO8601DateFormatter().date(from: timestamp),
+              let date = parseDate(timestamp),
               let tokens = integer(root["tokens"]),
               let requests = integer(root["requests"]),
               let costString = root["costUSD"] as? String,
@@ -163,7 +163,7 @@ struct JevObservedCostReader {
             for record in records {
                 guard let request = record["requestId"] as? String,
                       let timestamp = record["timestamp"] as? String,
-                      let date = ISO8601DateFormatter().date(from: timestamp),
+                      let date = parseDate(timestamp),
                       date > baseline.date,
                       let input = integer(record["jevInputTokens"]) else { continue }
                 let output = integer(record["jevOutputTokens"]) ?? 0
@@ -176,6 +176,12 @@ struct JevObservedCostReader {
             }
         }
         return JevCostSnapshot(inputTokens: tokens, costUSD: cost, status: malformed ? .partial : .available, requestCount: requests)
+    }
+
+    private func parseDate(_ value: String) -> Date? {
+        let fractional = ISO8601DateFormatter()
+        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return fractional.date(from: value) ?? ISO8601DateFormatter().date(from: value)
     }
 
     private func decimal(_ value: Any?) -> Decimal? {
