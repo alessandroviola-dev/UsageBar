@@ -23,7 +23,11 @@ struct OpenAICostReader {
                 total += Decimal(string: value.stringValue) ?? 0
             }
         }
-        return .init(usd: total, available: true)
+        // ForgeApis is the source used by the normal project API key. Prefer
+        // its settled local total when present; the Admin API can validly
+        // return zero for a different organization/project.
+        let local = localTelemetryCost()
+        return local.available && local.usd > 0 ? local : .init(usd: total, available: true)
     }
 
     private func localTelemetryCost() -> OpenAICostSnapshot {
