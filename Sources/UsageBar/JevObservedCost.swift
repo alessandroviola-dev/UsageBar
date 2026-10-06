@@ -31,7 +31,7 @@ enum JevCostFormatting {
         if value == 0 { return "$0.0000" }
         let ns = value as NSDecimalNumber
         let double = ns.doubleValue
-        if double >= 1 { return String(format: "$%.2f", double) }
+        // Keep four decimal places so sub-cent API costs remain visible.
         if double >= 0.01 { return String(format: "$%.4f", double) }
         // Six decimals preserve the expected sub-cent observations.
         return String(format: "$%.6f", double).replacingOccurrences(of: "0+$", with: "", options: .regularExpression)

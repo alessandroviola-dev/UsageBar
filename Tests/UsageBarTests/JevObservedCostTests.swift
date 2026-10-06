@@ -35,7 +35,7 @@ final class JevObservedCostTests: XCTestCase {
         let zero = JevObservedCostReader(telemetryURL: file, v1URL: root.appendingPathComponent("none"), v2URL: root.appendingPathComponent("none2")).read()
         XCTAssertEqual(zero.status, .available)
         XCTAssertEqual(zero.costUSD, 0)
-        XCTAssertEqual(JevCostFormatting.usd(42), "$42.00")
+        XCTAssertEqual(JevCostFormatting.usd(42), "$42.0000")
     }
 
     func testDashboardBaselineStartsAtConfirmedTotalAndAddsNewLedgerTokens() throws {
