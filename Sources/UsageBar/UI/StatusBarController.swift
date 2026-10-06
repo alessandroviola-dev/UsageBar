@@ -6,6 +6,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     private let monitor: UsageMonitor
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private var providersWindow: ProvidersWindowController?
+    private var openAICost: OpenAICostSnapshot = .init(usd: 0, available: false)
 
     init(monitor: UsageMonitor) {
         self.monitor = monitor
@@ -14,6 +15,11 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         button.font = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
         monitor.onChange = { [weak self] in self?.update() }
         update()
+        Task { [weak self] in
+            let value = await OpenAICostReader().read()
+            self?.openAICost = value
+            self?.update()
+        }
     }
 
     func update() {
@@ -47,6 +53,10 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         let jevItem = NSMenuItem(title: "Jev observed cost    \(jevValue)\(jevTotals)", action: nil, keyEquivalent: "")
         jevItem.isEnabled = false
         menu.addItem(jevItem)
+        let openAIValue = openAICost.available ? JevCostFormatting.usd(openAICost.usd) : "unavailable"
+        let openAIItem = NSMenuItem(title: "OpenAI API cost (30d)    \(openAIValue)", action: nil, keyEquivalent: "")
+        openAIItem.isEnabled = false
+        menu.addItem(openAIItem)
         if menu.items.isEmpty {
             let item = NSMenuItem(title: "\(monitor.activeProvider.statusName)\t?", action: nil, keyEquivalent: "")
             item.isEnabled = false
