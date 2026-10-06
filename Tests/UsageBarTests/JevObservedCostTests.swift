@@ -37,4 +37,52 @@ final class JevObservedCostTests: XCTestCase {
         XCTAssertEqual(zero.costUSD, 0)
         XCTAssertEqual(JevCostFormatting.usd(42), "$42.00")
     }
+
+    func testDashboardBaselineStartsAtConfirmedTotalAndAddsNewLedgerTokens() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let baseline = directory.appendingPathComponent("baseline.json")
+        let ledger = directory.appendingPathComponent("ledger.json")
+        let anchor = #"{"schema":"usagebar-jev-baseline-v1","anchoredAt":"2026-01-01T00:00:00Z","tokens":123915,"requests":163,"costUSD":"0.0046"}"#
+        let record = #"{"records":[{"requestId":"new-request","timestamp":"2026-01-01T00:00:01Z","jevInputTokens":100,"jevOutputTokens":20}]}"#
+        try anchor.write(to: baseline, atomically: true, encoding: .utf8)
+        try record.write(to: ledger, atomically: true, encoding: .utf8)
+
+        let snapshot = JevObservedCostReader(
+            telemetryURL: directory.appendingPathComponent("telemetry.jsonl"),
+            v1URL: directory.appendingPathComponent("v1.json"),
+            v2URL: directory.appendingPathComponent("v2.json"),
+            forgeJevLedgerURL: ledger,
+            forgeApisLedgerURL: directory.appendingPathComponent("other-ledger.json"),
+            baselineURL: baseline
+        ).read()
+
+        XCTAssertEqual(snapshot.inputTokens, 124_035)
+        XCTAssertEqual(snapshot.requestCount, 164)
+        XCTAssertEqual(snapshot.status, .available)
+        XCTAssertGreaterThan(snapshot.costUSD, Decimal(string: "0.0046")!)
+    }
+
+    func testJevMarkedTraceUsesRecordedCost() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let traces = directory.appendingPathComponent("forgejev-traces")
+        try FileManager.default.createDirectory(at: traces, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let telemetry = directory.appendingPathComponent("telemetry.jsonl")
+        let trace = traces.appendingPathComponent("session.jsonl")
+        let line = #"{"event":"turn","provider":"jev","runId":"run-1","timestamp":"2026-01-01T00:00:00Z","usage":{"input":1118,"cost":0.002308}}"#
+        try (line + "\n").write(to: trace, atomically: true, encoding: .utf8)
+
+        let snapshot = JevObservedCostReader(
+            telemetryURL: telemetry,
+            v1URL: directory.appendingPathComponent("missing-v1.json"),
+            v2URL: directory.appendingPathComponent("missing-v2.json"),
+            traceDirectoryURL: traces
+        ).read()
+
+        XCTAssertEqual(snapshot.inputTokens, 1118)
+        XCTAssertEqual(snapshot.costUSD, Decimal(string: "0.002308"))
+        XCTAssertEqual(snapshot.status, .available)
+    }
 }

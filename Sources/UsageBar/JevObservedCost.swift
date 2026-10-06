@@ -4,7 +4,15 @@ struct JevCostSnapshot: Equatable, Sendable {
     let inputTokens: Int64
     let costUSD: Decimal
     let status: Status
+    let requestCount: Int64
     enum Status: Equatable, Sendable { case available, unavailable, partial }
+
+    init(inputTokens: Int64, costUSD: Decimal, status: Status, requestCount: Int64 = 0) {
+        self.inputTokens = inputTokens
+        self.costUSD = costUSD
+        self.status = status
+        self.requestCount = requestCount
+    }
 }
 
 enum JevPricing {
@@ -30,37 +38,77 @@ enum JevCostFormatting {
 
 struct JevObservedCostReader {
     let telemetryURL: URL
+    let traceDirectoryURL: URL
     let v1URL: URL
     let v2URL: URL
+    let forgeJevLedgerURL: URL
+    let forgeApisLedgerURL: URL
+    let baselineURL: URL
 
     init(homeDirectory: URL = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)) {
         let base = homeDirectory.appendingPathComponent(".pi/agent/forgeapis", isDirectory: true)
-        telemetryURL = base.appendingPathComponent("telemetry.jsonl")
+        telemetryURL = base.appendingPathComponent("telemetry.jsonl") // Legacy ForgeApis location.
+        traceDirectoryURL = homeDirectory.appendingPathComponent(".pi/agent/forgejev-traces", isDirectory: true)
         v1URL = base.appendingPathComponent("real-usage-canary-v1/state.json")
         v2URL = base.appendingPathComponent("real-usage-canary-v2/state.json")
+        let agent = homeDirectory.appendingPathComponent(".pi/agent", isDirectory: true)
+        forgeJevLedgerURL = agent.appendingPathComponent("forgejev/routing/ledger.json")
+        // ForgeApis canonical ledger; production-ledger-v2.json is only a legacy fixture.
+        forgeApisLedgerURL = agent.appendingPathComponent("forgeapis/routing/ledger.json")
+        baselineURL = agent.appendingPathComponent("forgejev/usage-baseline.json")
     }
 
-    init(telemetryURL: URL, v1URL: URL, v2URL: URL) {
-        self.telemetryURL = telemetryURL; self.v1URL = v1URL; self.v2URL = v2URL
+    init(telemetryURL: URL, v1URL: URL, v2URL: URL, traceDirectoryURL: URL? = nil, forgeJevLedgerURL: URL? = nil, forgeApisLedgerURL: URL? = nil, baselineURL: URL? = nil) {
+        self.telemetryURL = telemetryURL
+        self.traceDirectoryURL = traceDirectoryURL ?? telemetryURL.deletingLastPathComponent().appendingPathComponent("forgejev-traces", isDirectory: true)
+        self.v1URL = v1URL
+        self.v2URL = v2URL
+        let agent = telemetryURL.deletingLastPathComponent().deletingLastPathComponent()
+        self.forgeJevLedgerURL = forgeJevLedgerURL ?? agent.appendingPathComponent("forgejev/routing/ledger.json")
+        self.forgeApisLedgerURL = forgeApisLedgerURL ?? agent.appendingPathComponent("forgeapis/routing/ledger.json")
+        self.baselineURL = baselineURL ?? agent.appendingPathComponent("forgejev/usage-baseline.json")
     }
 
     func read() -> JevCostSnapshot {
+        if let baseline = readBaseline() { return readSinceBaseline(baseline) }
         var tokens: Int64 = 0
+        var observedCost = Decimal.zero
+        var hasObservedCost = false
         var valid = false
         var malformed = false
         var identities = Set<String>()
-        if let data = try? Data(contentsOf: telemetryURL), let text = String(data: data, encoding: .utf8) {
+        var telemetryURLs = [telemetryURL]
+        if let traceURLs = try? FileManager.default.contentsOfDirectory(
+            at: traceDirectoryURL,
+            includingPropertiesForKeys: [.isRegularFileKey],
+            options: [.skipsHiddenFiles]
+        ) {
+            telemetryURLs += traceURLs.filter { $0.pathExtension == "jsonl" }
+        }
+        for url in telemetryURLs {
+            guard FileManager.default.fileExists(atPath: url.path) else { continue }
+            guard let data = try? Data(contentsOf: url), let text = String(data: data, encoding: .utf8) else { malformed = true; continue }
             valid = true
             for line in text.split(separator: "\n") {
                 guard let object = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any] else { malformed = true; continue }
-                guard object["event"] as? String == "router_classification",
-                      let classification = object["routerClassification"] as? [String: Any],
-                      let usage = classification["usage"] as? [String: Any],
-                      let input = integer(usage["inputTokens"]) else { malformed = true; continue }
-                let identity = "telemetry:\(object["runId"] as? String ?? ""):\(object["timestamp"] as? String ?? "")"
-                if identities.insert(identity).inserted { tokens += input }
+                let event = object["event"] as? String
+                let isLegacyTelemetry = url == telemetryURL
+                // Legacy assistant_message costs are Pi/OpenAI list prices for every model call,
+                // not Jev spend. Accept them only from a trace explicitly marked as Jev.
+                let isJevTrace = !isLegacyTelemetry && event == "turn" && object["provider"] as? String == "jev"
+                guard (isLegacyTelemetry && event == "router_classification") || isJevTrace else { continue }
+                let usage = (object["routerClassification"] as? [String: Any])?["usage"] as? [String: Any] ?? object["usage"] as? [String: Any]
+                guard let usage, let input = integer(usage["inputTokens"] ?? usage["input"]) else { malformed = true; continue }
+                let identity = "telemetry:\(object["runId"] as? String ?? object["sessionId"] as? String ?? url.lastPathComponent):\(object["timestamp"] as? String ?? ""):\(object["event"] as? String ?? "")"
+                if identities.insert(identity).inserted {
+                    tokens += input
+                    if isJevTrace, let cost = decimal(usage["costTotal"] ?? usage["cost"]) {
+                        observedCost += cost
+                        hasObservedCost = true
+                    }
+                }
             }
-        } else if FileManager.default.fileExists(atPath: telemetryURL.path) { malformed = true }
+        }
         let canaries = [v1URL, v2URL]
         for (index, url) in canaries.enumerated() {
             guard let data = try? Data(contentsOf: url) else { continue }
@@ -77,7 +125,62 @@ struct JevObservedCostReader {
             }
         }
         guard valid else { return JevCostSnapshot(inputTokens: 0, costUSD: 0, status: .unavailable) }
-        return JevCostSnapshot(inputTokens: tokens, costUSD: JevPricing.cost(inputTokens: tokens), status: malformed ? .partial : .available)
+        let cost = hasObservedCost ? observedCost : JevPricing.cost(inputTokens: tokens)
+        return JevCostSnapshot(inputTokens: tokens, costUSD: cost, status: malformed ? .partial : .available)
+    }
+
+    private struct Baseline {
+        let date: Date
+        let tokens: Int64
+        let requests: Int64
+        let costUSD: Decimal
+    }
+
+    private func readBaseline() -> Baseline? {
+        guard let data = try? Data(contentsOf: baselineURL),
+              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              root["schema"] as? String == "usagebar-jev-baseline-v1",
+              let timestamp = root["anchoredAt"] as? String,
+              let date = ISO8601DateFormatter().date(from: timestamp),
+              let tokens = integer(root["tokens"]),
+              let requests = integer(root["requests"]),
+              let costString = root["costUSD"] as? String,
+              let cost = Decimal(string: costString, locale: Locale(identifier: "en_US_POSIX")) else { return nil }
+        return Baseline(date: date, tokens: tokens, requests: requests, costUSD: cost)
+    }
+
+    private func readSinceBaseline(_ baseline: Baseline) -> JevCostSnapshot {
+        var tokens = baseline.tokens
+        var requests = baseline.requests
+        var cost = baseline.costUSD
+        var malformed = false
+        var identities = Set<String>()
+        let rate = baseline.costUSD / Decimal(max(baseline.tokens, 1))
+        for url in [forgeJevLedgerURL, forgeApisLedgerURL] {
+            guard let data = try? Data(contentsOf: url) else { continue }
+            guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let records = root["records"] as? [[String: Any]] else { malformed = true; continue }
+            for record in records {
+                guard let request = record["requestId"] as? String,
+                      let timestamp = record["timestamp"] as? String,
+                      let date = ISO8601DateFormatter().date(from: timestamp),
+                      date > baseline.date,
+                      let input = integer(record["jevInputTokens"]) else { continue }
+                let output = integer(record["jevOutputTokens"]) ?? 0
+                if identities.insert(request).inserted {
+                    let total = input + output
+                    tokens += total
+                    requests += 1
+                    cost += Decimal(total) * rate
+                }
+            }
+        }
+        return JevCostSnapshot(inputTokens: tokens, costUSD: cost, status: malformed ? .partial : .available, requestCount: requests)
+    }
+
+    private func decimal(_ value: Any?) -> Decimal? {
+        guard let number = value as? NSNumber, number.doubleValue >= 0 else { return nil }
+        return Decimal(string: number.stringValue, locale: Locale(identifier: "en_US_POSIX"))
     }
 
     private func integer(_ value: Any?) -> Int64? {

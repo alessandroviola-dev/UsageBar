@@ -8,7 +8,7 @@ GitHub Copilot is an optional secondary provider. Codex is the default provider 
 
 ## Jev observed cost
 
-UsageBar reads local ForgeApis telemetry and canary data in read-only mode to show **Jev observed cost**. It distinguishes zero usage, unavailable data, and partial observations. It never accesses the Jev API key, makes additional network calls, or invokes Jev. This is observed/list-price cost, not account spend.
+UsageBar reads local Jev trace files (`~/.pi/agent/forgejev-traces/*.jsonl`) and legacy ForgeApis telemetry/canary data in read-only mode to show **Jev observed cost**. It uses a recorded cost only for trace records explicitly marked with provider `jev`; generic Pi/OpenAI telemetry is deliberately excluded because its list price is not Jev spend. Otherwise it falls back to the versioned Jev input-token observation. An optional local Jev-dashboard anchor (`~/.pi/agent/forgejev/usage-baseline.json`) starts the displayed total from a confirmed dashboard value and adds new, deduplicated ledger records after its timestamp. It never accesses the Jev API key, makes additional network calls, or invokes Jev, so this is not yet an API-authoritative account-spend value.
 
 ## Providers
 
