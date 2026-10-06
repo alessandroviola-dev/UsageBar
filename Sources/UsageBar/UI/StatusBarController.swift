@@ -7,6 +7,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private var providersWindow: ProvidersWindowController?
     private var openAICost: OpenAICostSnapshot = .init(usd: 0, available: false)
+    private var openAICostTask: Task<Void, Never>?
 
     init(monitor: UsageMonitor) {
         self.monitor = monitor
@@ -15,12 +16,18 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         button.font = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
         monitor.onChange = { [weak self] in self?.update() }
         update()
-        Task { [weak self] in
-            let value = await OpenAICostReader().read()
-            self?.openAICost = value
-            self?.update()
+        openAICostTask = Task { [weak self] in
+            while !Task.isCancelled {
+                let value = await OpenAICostReader().read()
+                guard !Task.isCancelled else { return }
+                self?.openAICost = value
+                self?.update()
+                try? await Task.sleep(for: .seconds(300))
+            }
         }
     }
+
+    deinit { openAICostTask?.cancel() }
 
     func update() {
         statusItem.button?.title = UsageFormatting.statusTitle(providerName: monitor.activeProvider.statusName, snapshot: monitor.snapshot)
