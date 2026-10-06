@@ -175,6 +175,25 @@ struct JevObservedCostReader {
                 }
             }
         }
+        if let data = try? Data(contentsOf: traceDirectoryURL.appendingPathComponent("jev-usage.jsonl")),
+           let text = String(data: data, encoding: .utf8) {
+            for line in text.split(separator: "\n") {
+                guard let object = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any],
+                      object["event"] as? String == "jev_usage",
+                      object["source"] as? String == "forgeapis",
+                      let request = object["requestId"] as? String,
+                      let timestamp = object["timestamp"] as? String,
+                      let date = parseDate(timestamp), date > baseline.date,
+                      let usage = object["usage"] as? [String: Any],
+                      let input = integer(usage["inputTokens"]),
+                      identities.insert("shared:\(request)").inserted else { continue }
+                let output = integer(usage["outputTokens"]) ?? 0
+                let total = input + output
+                tokens += total
+                requests += 1
+                cost += Decimal(total) * rate
+            }
+        }
         return JevCostSnapshot(inputTokens: tokens, costUSD: cost, status: malformed ? .partial : .available, requestCount: requests)
     }
 
