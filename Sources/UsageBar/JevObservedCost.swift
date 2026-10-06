@@ -95,7 +95,7 @@ struct JevObservedCostReader {
                 let isLegacyTelemetry = url == telemetryURL
                 // Legacy assistant_message costs are Pi/OpenAI list prices for every model call,
                 // not Jev spend. Accept them only from a trace explicitly marked as Jev.
-                let isJevTrace = !isLegacyTelemetry && event == "turn" && object["provider"] as? String == "jev"
+                let isJevTrace = !isLegacyTelemetry && (event == "turn" || event == "jev_usage") && object["provider"] as? String == "jev"
                 guard (isLegacyTelemetry && event == "router_classification") || isJevTrace else { continue }
                 let usage = (object["routerClassification"] as? [String: Any])?["usage"] as? [String: Any] ?? object["usage"] as? [String: Any]
                 guard let usage, let input = integer(usage["inputTokens"] ?? usage["input"]) else { malformed = true; continue }
