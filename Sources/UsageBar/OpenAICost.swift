@@ -26,7 +26,7 @@ struct OpenAICostReader {
         return .init(usd: total, available: true)
     }
     private func key() -> String? {
-        var query: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrAccount as String: NSUserName(), kSecAttrService as String: service, kSecReturnData as String: true]
+        let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrAccount as String: NSUserName(), kSecAttrService as String: service, kSecReturnData as String: true]
         var result: CFTypeRef?
         guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
               let data = result as? Data else { return nil }
