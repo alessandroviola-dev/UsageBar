@@ -72,8 +72,7 @@ struct JevObservedCostReader {
     }
 
     func read() -> JevCostSnapshot {
-        // Use the complete ForgeApis telemetry. The baseline is only for the
-        // legacy Jev counter and would hide costs recorded by ForgeApis.
+        if let baseline = readBaseline() { return readSinceBaseline(baseline) }
         var tokens: Int64 = 0
         var observedCost = Decimal.zero
         var hasObservedCost = false
@@ -99,16 +98,13 @@ struct JevObservedCostReader {
                 // Legacy assistant_message costs are Pi/OpenAI list prices for every model call,
                 // not Jev spend. Accept them only from a trace explicitly marked as Jev.
                 let isJevTrace = !isLegacyTelemetry && (event == "turn" || event == "jev_usage") && object["provider"] as? String == "jev"
-                // ForgeApis records settled OpenAI spend as assistant_message
-                // entries in its canonical telemetry file.
-                let isForgeApisCost = isLegacyTelemetry && event == "assistant_message"
-                guard (isLegacyTelemetry && event == "router_classification") || isJevTrace || isForgeApisCost else { continue }
+                guard (isLegacyTelemetry && event == "router_classification") || isJevTrace else { continue }
                 let usage = (object["routerClassification"] as? [String: Any])?["usage"] as? [String: Any] ?? object["usage"] as? [String: Any]
                 guard let usage, let input = integer(usage["inputTokens"] ?? usage["input"]) else { malformed = true; continue }
                 let identity = "telemetry:\(object["runId"] as? String ?? object["sessionId"] as? String ?? url.lastPathComponent):\(object["timestamp"] as? String ?? ""):\(object["event"] as? String ?? "")"
                 if identities.insert(identity).inserted {
                     tokens += input
-                    if (isJevTrace || isForgeApisCost), let cost = decimal(usage["costTotal"] ?? usage["cost"]) {
+                    if isJevTrace, let cost = decimal(usage["costTotal"] ?? usage["cost"]) {
                         observedCost += cost
                         hasObservedCost = true
                     }
