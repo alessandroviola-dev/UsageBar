@@ -72,7 +72,8 @@ struct JevObservedCostReader {
     }
 
     func read() -> JevCostSnapshot {
-        if let baseline = readBaseline() { return readSinceBaseline(baseline) }
+        // Use the complete ForgeApis telemetry. The baseline is only for the
+        // legacy Jev counter and would hide costs recorded by ForgeApis.
         var tokens: Int64 = 0
         var observedCost = Decimal.zero
         var hasObservedCost = false
