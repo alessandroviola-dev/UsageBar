@@ -1,16 +1,28 @@
 #!/bin/bash
-# Removes only UsageBar. UsageBar does not create or manage provider credentials.
+# Removes only verified UsageBar bundles, never provider credentials.
 set -euo pipefail
-APP="$HOME/Applications/UsageBar.app"
+ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
+source "$ROOT/scripts/common.sh"
+DELETE_PREFERENCES=0
 case "${1:-}" in
-  '') ;;
-  *) echo "Usage: $0" >&2; exit 2 ;;
+    '') ;;
+    --delete-preferences) DELETE_PREFERENCES=1 ;;
+    *) printf 'Usage: %s [--delete-preferences]\n' "$0" >&2; exit 2 ;;
 esac
-pkill -x UsageBar 2>/dev/null || true
-if [[ -x "$APP/Contents/MacOS/UsageBar" ]]; then
-  "$APP/Contents/MacOS/UsageBar" --unregister-launch-at-login || true
+[[ $# -le 1 ]] || fail 'Too many arguments.'
+check_existing_app
+check_existing_app "$LEGACY_APP"
+for app in "$APP" "$LEGACY_APP"; do
+    [[ ! -e "$app" || -w $(dirname "$app") ]] || fail "Directory is not writable: $(dirname "$app")"
+done
+for app in "$APP" "$LEGACY_APP"; do
+    [[ -e "$app" ]] || continue
+    stop_installed_app "$app"
+    "$app/Contents/MacOS/UsageBar" --unregister-launch-at-login || fail "Launch at Login could not be removed; retained: $app"
+    rm -rf -- "$app"
+done
+# Preserve user settings unless deletion was explicitly requested.
+if [[ $DELETE_PREFERENCES == 1 ]]; then
+    defaults delete "$BUNDLE_ID" 2>/dev/null || true
 fi
-rm -rf "$APP"
-# The selected provider is non-secret; removing it makes a reinstall clean.
-defaults delete com.alessandroviola.usagebar 2>/dev/null || true
-echo "Removed UsageBar."
+printf 'Removed UsageBar. Provider credentials were left untouched.\n'

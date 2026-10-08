@@ -1,6 +1,19 @@
 import AppKit
 import ServiceManagement
 
+enum LaunchAtLoginRemoval {
+    struct UnsupportedOS: Error {}
+
+    static func exitCode(unregister: () throws -> Void) -> Int32 {
+        do {
+            try unregister()
+            return EXIT_SUCCESS
+        } catch {
+            return EXIT_FAILURE
+        }
+    }
+}
+
 @main
 @MainActor
 final class UsageBarApp: NSObject, NSApplicationDelegate {
@@ -10,8 +23,18 @@ final class UsageBarApp: NSObject, NSApplicationDelegate {
 
     static func main() {
         if CommandLine.arguments.contains("--unregister-launch-at-login") {
-            if #available(macOS 13.0, *) { try? SMAppService.mainApp.unregister() }
-            return
+            let code = LaunchAtLoginRemoval.exitCode {
+                if #available(macOS 13.0, *) {
+                    try SMAppService.mainApp.unregister()
+                } else {
+                    throw LaunchAtLoginRemoval.UnsupportedOS()
+                }
+            }
+            if code != EXIT_SUCCESS {
+                // Never log potentially sensitive framework error descriptions.
+                fputs("UsageBar: unable to unregister Launch at Login.\n", stderr)
+            }
+            exit(code)
         }
         let app = NSApplication.shared
         let delegate = UsageBarApp()

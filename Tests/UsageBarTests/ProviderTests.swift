@@ -81,13 +81,20 @@ final class ProviderTests: XCTestCase {
         let script = root.appendingPathComponent("codex")
         let body = """
         #!/bin/sh
-        read first
+        IFS= read -r first || exit 10
+        case "$first" in *'"method":"initialize"'*) ;; *) exit 11 ;; esac
         printf '%s\\n' "$first" > "\(log.path)"
         echo '{"id":1,"result":{}}'
-        read second
-        read third
+        IFS= read -r second || exit 12
+        [ "$second" = '{"method":"initialized"}' ] || exit 13
+        IFS= read -r third || exit 14
+        case "$third" in *'"method":"account/rateLimits/read"'*) ;; *) exit 15 ;; esac
         printf '%s\\n%s\\n' "$second" "$third" >> "\(log.path)"
         echo '{"id":2,"result":{"rateLimits":{"primary":{"usedPercent":20,"windowDurationMins":300}}}}'
+        # Keep stdout and the child alive until the client closes stdin.
+        # This removes the response/child-exit race without sleeps or retries.
+        IFS= read -r shutdown
+        exit 0
         """
         try Data(body.utf8).write(to: script)
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: script.path)

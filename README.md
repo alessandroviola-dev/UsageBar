@@ -58,7 +58,7 @@ swift build --arch arm64 -Xswiftc -warnings-as-errors
 ./install.sh
 ```
 
-`install.sh` installs only `~/Applications/UsageBar.app`. The app has no Dock icon and supports Launch at Login.
+`install.sh` installs only `/Applications/UsageBar.app`. `/Applications` must be writable; there is no per-user fallback. Verified legacy copies in `~/Applications` are backed up and removed only after successful installation; failures restore both copies. Invalid or symlinked bundles are refused. After migration, check Launch at Login in the canonical app. The app has no Dock icon.
 
 ## Uninstall
 
@@ -66,7 +66,7 @@ swift build --arch arm64 -Xswiftc -warnings-as-errors
 ./uninstall.sh
 ```
 
-The uninstaller removes only UsageBar and its selected-provider preference. It never alters Codex or GitHub authentication.
+The uninstaller removes only verified `/Applications/UsageBar.app` and any legacy `~/Applications/UsageBar.app`. Preferences are preserved by default; `./uninstall.sh --delete-preferences` explicitly removes the UsageBar preference domain. It never alters Codex or GitHub authentication.
 
 ## Limitations
 
