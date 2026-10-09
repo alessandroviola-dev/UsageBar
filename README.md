@@ -43,7 +43,9 @@ See [PROVIDERS.md](PROVIDERS.md) for implementation and live-test status.
 
 ## Installation
 
-Download the latest `UsageBar-vX.Y.Z-macOS.zip` from [GitHub Releases](https://github.com/alessandroviola-dev/UsageBar/releases), extract `UsageBar.app`, drag it to `/Applications`, and open it.
+Download the existing `UsageBar-v0.3.2-macOS.zip` (version 0.3.2, build 5) from [GitHub Releases](https://github.com/alessandroviola-dev/UsageBar/releases), extract `UsageBar.app`, and install it at the canonical path `/Applications/UsageBar.app`.
+
+The installer and uninstaller fixes on `main` apply to the checked-out source scripts. Publishing these commits does not replace the existing v0.3.2 ZIP or imply that it contains the new fixes. A new binary release is a separate decision.
 
 Current builds are ad-hoc signed unless a release states otherwise. If Gatekeeper blocks the first launch, control-click the app, choose **Open**, then confirm. Do not disable Gatekeeper globally.
 
